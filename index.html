@@ -224,6 +224,38 @@ details summary { cursor: pointer; font-weight: 500; }
 .files { margin: 0; padding: 0; list-style: none; font: 400 13px var(--font-mono); color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
 ol.guide { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
+.ly-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 880px) { .ly-grid { grid-template-columns: minmax(0, 1fr); } }
+.ly-grid > div { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.layers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.layers > li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--field); min-width: 0; }
+.layers > li.ly-empty { color: var(--muted); font-size: 14px; border-style: dashed; }
+.ly-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.ly-top .nm { font-weight: 600; min-width: 0; overflow-wrap: anywhere; flex: 1 1 160px; }
+.badge { font: 600 11px var(--font-mono); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+.ly-opt { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; }
+.ly-opt select { width: auto; max-width: 100%; padding: 4px 8px; }
+.ly-opt input[type="range"] { width: 120px; padding: 0; }
+.ly-opt label { display: inline-flex; gap: 6px; align-items: center; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; gap: 5px; align-items: center; }
+.sw { width: 11px; height: 11px; border-radius: 2px; flex: none; display: inline-block; }
+.btn-sm { font: 500 13px var(--font-body); padding: 4px 10px; }
+.ana { display: flex; flex-direction: column; gap: 14px; }
+.ana-ly { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ana-ly h3 { margin: 0; }
+.arow { display: flex; flex-direction: column; gap: 3px; }
+.arow .t { display: flex; gap: 8px; align-items: baseline; font-size: 14px; min-width: 0; }
+.arow .al { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.arow .av { font: 500 13px var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.arow .bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.arow .bar i { display: block; height: 100%; }
+.pop { color: #14211D; font: 13px/1.4 var(--font-body); display: flex; flex-direction: column; gap: 6px; }
+.pop-h { font: 500 11px var(--font-mono); color: #53655F; }
+.pop-t { font-weight: 600; }
+.pop table { border-collapse: collapse; width: 100%; }
+.pop td { padding: 2px 6px 2px 0; vertical-align: top; border-bottom: 1px solid #DDE5E1; overflow-wrap: anywhere; }
+.pop td:first-child { color: #53655F; white-space: nowrap; }
 [hidden] { display: none !important; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -267,6 +299,57 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <p class="hint" id="mapHint"></p>
     </div>
     <p class="msg" id="mapMsg" aria-live="polite"></p>
+    <p class="hint">Kalau citra satelit tampak kosong atau bertuliskan "Map data not yet available", perkecil satu tingkat zoom atau pindah ke Peta jalan. Ketajaman citra bergantung pada cakupan penyedia di lokasi tersebut.</p>
+  </section>
+
+  <section class="panel" aria-label="Layer data">
+    <h2>Layer data</h2>
+    <p class="hint">Tampilkan peta tata ruang atau data lain di atas peta, klik peta untuk melihat atributnya, dan cek otomatis poligon Anda terkena zona apa saja. Hasilnya indikatif dan tidak menggantikan KKPR resmi dari OSS. Pastikan Anda berhak memakai data atau layanan yang dimuat.</p>
+    <div class="ly-grid">
+      <div>
+        <h3>Layanan peta (WMS atau ubin XYZ)</h3>
+        <div class="field">
+          <label for="lkind">Jenis</label>
+          <select id="lkind"><option value="wms">WMS</option><option value="xyz">Ubin XYZ</option></select>
+        </div>
+        <div class="field">
+          <label for="lurl">Alamat layanan (https)</label>
+          <input id="lurl" type="text" autocomplete="off" spellcheck="false" placeholder="https://contoh.go.id/geoserver/wms">
+        </div>
+        <div class="field" id="lLayersField">
+          <label for="llayers">Nama layer (pisahkan koma bila lebih dari satu)</label>
+          <input id="llayers" type="text" list="lyOpts" autocomplete="off" spellcheck="false">
+          <datalist id="lyOpts"></datalist>
+        </div>
+        <div class="field">
+          <label for="llabel">Label (opsional)</label>
+          <input id="llabel" type="text" maxlength="60" autocomplete="off">
+        </div>
+        <details id="lAdv">
+          <summary>Pengaturan lanjutan</summary>
+          <div class="row" style="margin-top: 10px">
+            <div class="field"><label for="lver">Versi WMS</label><select id="lver"><option value="1.1.1">1.1.1</option><option value="1.3.0">1.3.0</option></select></div>
+            <div class="field"><label for="linfo">Format info klik</label><select id="linfo"><option value="application/json">JSON</option><option value="text/html">HTML</option><option value="text/plain">Teks</option><option value="text/xml">XML</option></select></div>
+          </div>
+        </details>
+        <div class="actions">
+          <button type="button" class="btn" id="btnCaps">Baca daftar layer</button>
+          <button type="button" class="btn btn-primary" id="btnLyAdd">Tambah layer</button>
+        </div>
+        <p class="msg" id="lyMsg" aria-live="polite"></p>
+      </div>
+      <div>
+        <h3>Data sendiri</h3>
+        <p class="hint">Muat file RTRW, kawasan hutan, layout mill, atau data lain: ZIP shapefile (berisi .shp .dbf dan sebaiknya .prj), GeoJSON, KML, atau KMZ. File diproses di peramban dan tidak diunggah ke mana pun. Untuk file besar, potong dulu per kabupaten atau area di QGIS.</p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="btnData">Muat file data</button>
+        </div>
+        <input type="file" id="dataIn" accept=".zip,.geojson,.json,.kml,.kmz" multiple hidden>
+        <p class="msg" id="dataMsg" aria-live="polite"></p>
+      </div>
+    </div>
+    <ul class="layers" id="layerList"></ul>
+    <div class="ana" id="analysis" aria-live="polite"></div>
   </section>
 
   <div class="two">
@@ -397,6 +480,8 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js"></script>
 <script>
 
 // ---------- Transverse Mercator (UTM, WGS 84) ----------
@@ -817,16 +902,17 @@ function buildPackage(res, attrs, base, when) {
       ['btnLocate', 'bmSat', 'bmOsm'].forEach(i => { $(i).disabled = true; });
       return;
     }
-    map = L.map(el, { doubleClickZoom: false }).setView([-7.47, 112.43], 10);
+    map = L.map(el, { doubleClickZoom: false, preferCanvas: true, maxZoom: 19 }).setView([-7.47, 112.43], 10);
+    map.createPane('data').style.zIndex = 350;
     esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 20, maxNativeZoom: 18,
+      maxZoom: 19, maxNativeZoom: 19,
       attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
     }).addTo(map);
     osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 20, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+      maxZoom: 19, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap contributors'
     });
     group = L.layerGroup().addTo(map);
-    map.on('click', e => { if (!state.closed) { addPoint(e.latlng.lng, e.latlng.lat); } });
+    map.on('click', e => { if (!state.closed) { addPoint(e.latlng.lng, e.latlng.lat); } else { infoAt(e.latlng); } });
   }
 
   function setBase(which) {
@@ -870,6 +956,7 @@ function buildPackage(res, attrs, base, when) {
       if (d < bd) { bd = d; best = i; }
     }
     if (best >= 0 && bd <= 14) { state.pts.splice(best + 1, 0, [e.latlng.lng, e.latlng.lat]); renderAll(); }
+    else infoAt(e.latlng);
   }
 
   function drawMap(res) {
@@ -1221,6 +1308,7 @@ function buildPackage(res, attrs, base, when) {
     const res = renderInfo();
     drawMap(res);
     if (!dirty && document.activeElement !== $('coords')) $('coords').value = formatPts(state.pts);
+    queueAnalysis();
   }
   function scheduleInfo() { clearTimeout(timer); timer = setTimeout(renderInfo, 150); }
 
@@ -1245,7 +1333,413 @@ function buildPackage(res, attrs, base, when) {
     catch (e) { setMsg('dlMsg', 'Penyalinan otomatis ditolak. Buka "Tabel titik hasil konversi" dan salin dari sana.', 'bad'); }
   });
 
+  // ---------- layer data ----------
+  const layers = [];
+  let nextId = 1, anaTimer = 0, anaSeq = 0, lastAna = null;
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const hashStr = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+  const colorFor = s => 'hsl(' + ((hashStr(String(s)) * 47) % 360) + ',62%,48%)';
+  const LABEL_PRIORITY = ['polaruang', 'zona', 'namazona', 'namobj', 'nmzona', 'kawasan', 'fungsi', 'peruntukan', 'nama', 'name', 'keterangan', 'remark', 'jenis', 'kode', 'kdzona'];
+  function guessLabel(keys) {
+    const norm = k => k.toLowerCase().replace(/[^a-z]/g, '');
+    for (const p of LABEL_PRIORITY) { const k = keys.find(x => norm(x) === p); if (k) return k; }
+    return keys[0] || '';
+  }
+  function labelOf(ly, f) {
+    const v = f && f.properties ? f.properties[ly.labelField] : null;
+    return v === null || v === undefined || v === '' ? '(tanpa nama)' : String(v);
+  }
+  function styleFor(ly, f) {
+    const c = colorFor(labelOf(ly, f));
+    return { color: c, weight: 1.2, opacity: Math.min(1, ly.opacity + 0.25), fillColor: c, fillOpacity: ly.opacity * 0.5 };
+  }
+  function needTurf() {
+    if (typeof turf === 'undefined') throw new Error('Pustaka analisis (Turf) tidak termuat. Periksa koneksi internet lalu muat ulang halaman.');
+  }
+
+  function buildParts(feats) {
+    const parts = [];
+    feats.forEach((f, fi) => {
+      const g = f.geometry;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+      polys.forEach(c => { try { const poly = turf.polygon(c); parts.push({ fi, poly, bbox: turf.bbox(poly) }); } catch (e) { /* bentuk rusak dilewati */ } });
+    });
+    return parts;
+  }
+
+  function addDataLayer(name, fc) {
+    if (!map) throw new Error('Peta belum tersedia.');
+    needTurf();
+    const feats = (fc.features || []).filter(f => f && f.geometry);
+    if (!feats.length) throw new Error('File tidak memuat bentuk geometri.');
+    const bb = turf.bbox({ type: 'FeatureCollection', features: feats });
+    if (!bb.every(isFinite) || bb[0] < -180 || bb[2] > 180 || bb[1] < -90 || bb[3] > 90) {
+      throw new Error('Koordinat bukan derajat WGS 84. Sertakan file .prj di dalam ZIP atau ubah ke WGS 84 di QGIS dulu.');
+    }
+    const keyset = new Set();
+    feats.slice(0, 300).forEach(f => Object.keys(f.properties || {}).forEach(k => keyset.add(k)));
+    const keys = [...keyset];
+    const ly = { id: nextId++, kind: 'data', name, feats, keys, labelField: guessLabel(keys), visible: true, analyze: true, opacity: 0.6, parts: buildParts(feats) };
+    ly.analyze = ly.parts.length > 0;
+    ly.obj = L.geoJSON({ type: 'FeatureCollection', features: feats }, {
+      pane: 'data', interactive: false,
+      style: f => styleFor(ly, f),
+      pointToLayer: (f, ll) => L.circleMarker(ll, Object.assign({ pane: 'data', radius: 5, interactive: false }, styleFor(ly, f)))
+    }).addTo(map);
+    layers.push(ly);
+    if (!state.pts.length) map.fitBounds(ly.obj.getBounds(), { padding: [30, 30] });
+    renderLayers(); queueAnalysis();
+    return ly;
+  }
+
+  function addServiceLayer(cfg, persist) {
+    if (!map) { setMsg('lyMsg', 'Peta belum tersedia.', 'bad'); return; }
+    cfg.id = nextId++; cfg.kind = cfg.kind === 'xyz' ? 'xyz' : 'wms';
+    if (cfg.kind === 'wms') {
+      cfg.obj = L.tileLayer.wms(cfg.url, { pane: 'data', layers: cfg.layers, version: cfg.version, format: 'image/png', transparent: true, opacity: cfg.opacity, maxZoom: 22 });
+    } else {
+      cfg.obj = L.tileLayer(cfg.url, { pane: 'data', opacity: cfg.opacity, maxZoom: 22 });
+    }
+    let ok = 0, bad = 0;
+    cfg.obj.on('tileload', () => { ok++; });
+    cfg.obj.on('tileerror', () => { bad++; if (!ok && bad >= 3 && !cfg.warn) { cfg.warn = true; renderLayers(); } });
+    if (cfg.visible) cfg.obj.addTo(map);
+    layers.push(cfg);
+    if (persist) saveServices();
+    renderLayers();
+  }
+  function saveServices() {
+    try {
+      const keep = layers.filter(l => l.kind !== 'data').map(l => ({ kind: l.kind, url: l.url, layers: l.layers, name: l.name, opacity: l.opacity, visible: l.visible, version: l.version, info: l.info, query: l.query }));
+      localStorage.setItem('shp_services', JSON.stringify(keep));
+    } catch (e) { /* tanpa penyimpanan */ }
+  }
+  function loadServices() {
+    try {
+      const raw = localStorage.getItem('shp_services');
+      if (raw) JSON.parse(raw).forEach(c => { if (c && /^https:\/\//i.test(c.url)) addServiceLayer(c, false); });
+    } catch (e) { /* abaikan */ }
+  }
+
+  function removeLayer(ly) {
+    if (map && ly.obj) map.removeLayer(ly.obj);
+    layers.splice(layers.indexOf(ly), 1);
+    if (ly.kind !== 'data') saveServices();
+    renderLayers(); queueAnalysis();
+  }
+
+  function layerItem(ly) {
+    const li = mk('li');
+    const top = mk('div', 'ly-top');
+    const vis = mk('input'); vis.type = 'checkbox'; vis.checked = ly.visible; vis.id = 'lyv' + ly.id; vis.setAttribute('aria-label', 'Tampilkan ' + ly.name);
+    vis.addEventListener('change', () => {
+      ly.visible = vis.checked;
+      if (vis.checked) ly.obj.addTo(map); else map.removeLayer(ly.obj);
+      if (ly.kind !== 'data') saveServices();
+    });
+    top.append(vis, mk('span', 'nm', ly.name), mk('span', 'badge', ly.kind === 'data' ? ly.feats.length.toLocaleString('id-ID') + ' fitur' : ly.kind.toUpperCase()));
+    if (ly.kind === 'data' && ly.obj) {
+      const z = mk('button', 'btn btn-sm', 'Zoom ke layer'); z.type = 'button';
+      z.addEventListener('click', () => map.fitBounds(ly.obj.getBounds(), { padding: [30, 30] }));
+      top.appendChild(z);
+    }
+    const rm = mk('button', 'btn btn-sm', 'Hapus'); rm.type = 'button';
+    rm.addEventListener('click', () => removeLayer(ly));
+    top.appendChild(rm);
+    li.appendChild(top);
+
+    const opt = mk('div', 'ly-opt');
+    const rl = mk('label'); rl.append('Transparansi ');
+    const rg = mk('input'); rg.type = 'range'; rg.min = '0.1'; rg.max = '1'; rg.step = '0.05'; rg.value = String(ly.opacity); rg.setAttribute('aria-label', 'Kepekatan layer ' + ly.name);
+    rg.addEventListener('input', () => {
+      ly.opacity = +rg.value;
+      if (ly.kind === 'data') ly.obj.setStyle(f => styleFor(ly, f)); else ly.obj.setOpacity(ly.opacity);
+    });
+    rg.addEventListener('change', () => { if (ly.kind !== 'data') saveServices(); });
+    rl.appendChild(rg); opt.appendChild(rl);
+
+    if (ly.kind === 'wms') {
+      const ql = mk('label'); const qc = mk('input'); qc.type = 'checkbox'; qc.checked = !!ly.query;
+      qc.addEventListener('change', () => { ly.query = qc.checked; saveServices(); });
+      ql.append(qc, 'Info saat peta diklik'); opt.appendChild(ql);
+    }
+    if (ly.kind === 'data') {
+      const sl = mk('label'); sl.append('Kolom label ');
+      const sel = mk('select'); sel.setAttribute('aria-label', 'Kolom label ' + ly.name);
+      (ly.keys.length ? ly.keys : ['']).forEach(k => { const o = mk('option', '', k || '(tidak ada atribut)'); o.value = k; sel.appendChild(o); });
+      sel.value = ly.labelField;
+      sel.addEventListener('change', () => { ly.labelField = sel.value; ly.obj.setStyle(f => styleFor(ly, f)); renderLayers(); queueAnalysis(); });
+      sl.appendChild(sel); opt.appendChild(sl);
+      const al = mk('label'); const ac = mk('input'); ac.type = 'checkbox'; ac.checked = ly.analyze; ac.disabled = !ly.parts.length;
+      ac.addEventListener('change', () => { ly.analyze = ac.checked; queueAnalysis(); });
+      al.append(ac, ly.parts.length ? 'Ikut analisis' : 'Tanpa poligon, tidak bisa dianalisis'); opt.appendChild(al);
+    }
+    li.appendChild(opt);
+
+    if (ly.kind === 'data' && ly.labelField) {
+      const cnt = new Map();
+      ly.feats.slice(0, 5000).forEach(f => { const k = labelOf(ly, f); cnt.set(k, (cnt.get(k) || 0) + 1); });
+      const top8 = [...cnt].sort((a, b) => b[1] - a[1]).slice(0, 8);
+      const lg = mk('div', 'legend');
+      top8.forEach(([k]) => { const s = mk('span'); const sw = mk('i', 'sw'); sw.style.background = colorFor(k); s.append(sw, k); lg.appendChild(s); });
+      if (cnt.size > 8) lg.appendChild(mk('span', '', '+' + (cnt.size - 8) + ' nilai lain'));
+      li.appendChild(lg);
+    }
+    if (ly.warn) li.appendChild(mk('p', 'msg', 'Belum ada ubin yang berhasil dimuat. Periksa alamat layanan dan nama layer, atau layanan mungkin tidak mengizinkan akses dari peramban.')).dataset.s = 'warn';
+    return li;
+  }
+  function renderLayers() {
+    const ul = $('layerList'); ul.innerHTML = '';
+    if (!layers.length) { ul.appendChild(mk('li', 'ly-empty', 'Belum ada layer. Tambahkan layanan peta atau muat data di atas.')); return; }
+    layers.forEach(ly => ul.appendChild(layerItem(ly)));
+  }
+
+  // ----- tambah layanan -----
+  $('lkind').addEventListener('change', () => {
+    const x = $('lkind').value === 'xyz';
+    $('lLayersField').hidden = x; $('lAdv').hidden = x; $('btnCaps').hidden = x;
+    $('lurl').placeholder = x ? 'https://contoh.id/tiles/{z}/{x}/{y}.png' : 'https://contoh.go.id/geoserver/wms';
+  });
+  $('btnCaps').addEventListener('click', async () => {
+    const url = $('lurl').value.trim();
+    if (!/^https:\/\//i.test(url)) { setMsg('lyMsg', 'Alamat harus diawali https://', 'bad'); return; }
+    setMsg('lyMsg', 'Membaca daftar layer…');
+    try {
+      const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'service=WMS&request=GetCapabilities');
+      if (!r.ok) throw new Error('http ' + r.status);
+      const doc = new DOMParser().parseFromString(await r.text(), 'application/xml');
+      const names = [...doc.getElementsByTagNameNS('*', 'Layer')].map(n => {
+        const c = [...n.children];
+        const nm = c.find(x => x.localName === 'Name'), tt = c.find(x => x.localName === 'Title');
+        return nm ? { name: nm.textContent.trim(), title: tt ? tt.textContent.trim() : '' } : null;
+      }).filter(Boolean).slice(0, 300);
+      if (!names.length) throw new Error('kosong');
+      const dl = $('lyOpts'); dl.innerHTML = '';
+      names.forEach(n => { const o = document.createElement('option'); o.value = n.name; o.label = n.title; dl.appendChild(o); });
+      setMsg('lyMsg', names.length + ' layer ditemukan. Klik kolom nama layer untuk memilih.', 'ok');
+    } catch (e) {
+      setMsg('lyMsg', 'Daftar layer tidak bisa dibaca dari peramban (server menolak akses lintas situs atau alamat salah). Isi nama layer secara manual. Nama layer bisa dilihat di QGIS atau dokumentasi layanan.', 'warn');
+    }
+  });
+  $('btnLyAdd').addEventListener('click', () => {
+    const kind = $('lkind').value, url = $('lurl').value.trim(), lay = $('llayers').value.trim();
+    if (!/^https:\/\//i.test(url)) { setMsg('lyMsg', 'Alamat harus diawali https:// agar bisa dimuat di halaman ini.', 'bad'); return; }
+    if (kind === 'wms' && !lay) { setMsg('lyMsg', 'Isi nama layer WMS.', 'bad'); return; }
+    if (kind === 'xyz' && !(/\{z\}/.test(url) && /\{x\}/.test(url) && /\{y\}/.test(url))) { setMsg('lyMsg', 'Alamat ubin XYZ harus memuat {z}, {x}, dan {y}.', 'bad'); return; }
+    let host = ''; try { host = new URL(url.replace(/\{[xyz]\}/g, '0')).hostname; } catch (e) { setMsg('lyMsg', 'Alamat tidak valid.', 'bad'); return; }
+    addServiceLayer({ kind, url, layers: lay, name: $('llabel').value.trim() || lay || host, opacity: 0.7, visible: true, version: $('lver').value, info: $('linfo').value, query: kind === 'wms' }, true);
+    setMsg('lyMsg', 'Layer ditambahkan. Geser peta ke wilayah layanan itu bila belum tampak.', 'ok');
+  });
+
+  // ----- muat data sendiri -----
+  function kmlToFC(text) {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('File KML tidak valid.');
+    const coords = n => n.textContent.trim().split(/\s+/).map(t => t.split(',').map(Number)).filter(a => a.length >= 2 && isFinite(a[0]) && isFinite(a[1])).map(a => [a[0], a[1]]);
+    const feats = [];
+    [...doc.getElementsByTagNameNS('*', 'Placemark')].forEach(pm => {
+      const props = {};
+      const nm = [...pm.children].find(c => c.localName === 'Name' || c.localName === 'name');
+      if (nm) props.name = nm.textContent.trim();
+      [...pm.getElementsByTagNameNS('*', 'Data')].forEach(d => { const v = d.getElementsByTagNameNS('*', 'value')[0]; props[d.getAttribute('name')] = v ? v.textContent.trim() : ''; });
+      [...pm.getElementsByTagNameNS('*', 'SimpleData')].forEach(d => { props[d.getAttribute('name')] = d.textContent.trim(); });
+      const polys = [...pm.getElementsByTagNameNS('*', 'Polygon')].map(pg => {
+        const rings = [];
+        const ob = pg.getElementsByTagNameNS('*', 'outerBoundaryIs')[0];
+        if (ob) { const c = ob.getElementsByTagNameNS('*', 'coordinates')[0]; if (c) rings.push(coords(c)); }
+        [...pg.getElementsByTagNameNS('*', 'innerBoundaryIs')].forEach(ib => { const c = ib.getElementsByTagNameNS('*', 'coordinates')[0]; if (c) rings.push(coords(c)); });
+        return rings.filter(r => r.length >= 4);
+      }).filter(r => r.length);
+      if (polys.length === 1) feats.push({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: polys[0] } });
+      else if (polys.length > 1) feats.push({ type: 'Feature', properties: props, geometry: { type: 'MultiPolygon', coordinates: polys } });
+      else {
+        const ls = pm.getElementsByTagNameNS('*', 'LineString')[0], pt = pm.getElementsByTagNameNS('*', 'Point')[0];
+        if (ls) { const c = ls.getElementsByTagNameNS('*', 'coordinates')[0]; if (c) feats.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: coords(c) } }); }
+        else if (pt) { const c = pt.getElementsByTagNameNS('*', 'coordinates')[0]; const a = c ? coords(c)[0] : null; if (a) feats.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: a } }); }
+      }
+    });
+    return { type: 'FeatureCollection', features: feats };
+  }
+  function toFC(o) {
+    if (!o) return { type: 'FeatureCollection', features: [] };
+    if (o.type === 'FeatureCollection') return o;
+    if (o.type === 'Feature') return { type: 'FeatureCollection', features: [o] };
+    return { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: o }] };
+  }
+  async function loadDataFile(f) {
+    if (f.size > 40e6) throw new Error('Ukuran lebih dari 40 MB, terlalu besar untuk peramban. Potong per kabupaten atau area di QGIS dulu.');
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    const base = f.name.replace(/\.[^.]+$/, '');
+    let fcs;
+    if (ext === 'zip') {
+      if (typeof shp === 'undefined') throw new Error('Pustaka pembaca SHP tidak termuat. Periksa koneksi internet lalu muat ulang halaman.');
+      const g = await shp(await f.arrayBuffer());
+      fcs = (Array.isArray(g) ? g : [g]).map(x => ({ name: x.fileName || base, fc: x }));
+    } else if (ext === 'geojson' || ext === 'json') fcs = [{ name: base, fc: toFC(JSON.parse(await f.text())) }];
+    else if (ext === 'kml') fcs = [{ name: base, fc: kmlToFC(await f.text()) }];
+    else if (ext === 'kmz') fcs = [{ name: base, fc: kmlToFC(await readKmz(await f.arrayBuffer())) }];
+    else throw new Error('Format .' + ext + ' belum didukung.');
+    return fcs.map(x => addDataLayer(x.name, x.fc));
+  }
+  $('btnData').addEventListener('click', () => $('dataIn').click());
+  $('dataIn').addEventListener('change', async () => {
+    const files = [...$('dataIn').files]; $('dataIn').value = '';
+    if (!files.length) return;
+    const notes = []; let fail = false;
+    for (const f of files) {
+      setMsg('dataMsg', 'Membaca ' + f.name + '…');
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        const made = await loadDataFile(f);
+        made.forEach(ly => notes.push(ly.name + ': ' + ly.feats.length.toLocaleString('id-ID') + ' fitur' + (ly.parts.length ? '' : ' (tanpa poligon)')));
+      } catch (e) { fail = true; notes.push(f.name + ': gagal. ' + (e && e.message ? e.message : 'format tidak dikenali.')); }
+    }
+    setMsg('dataMsg', notes.join(' | '), fail ? 'bad' : 'ok');
+  });
+
+  // ----- info saat peta diklik -----
+  function propsBlock(title, props) {
+    const d = mk('div'); d.appendChild(mk('div', 'pop-t', title));
+    const ents = Object.entries(props).filter(([, v]) => v !== null && v !== undefined && v !== '').slice(0, 14);
+    if (!ents.length) { d.appendChild(mk('div', '', '(tanpa atribut)')); return d; }
+    const t = mk('table');
+    ents.forEach(([k, v]) => { const tr = mk('tr'); tr.append(mk('td', '', k), mk('td', '', String(typeof v === 'object' ? JSON.stringify(v) : v).slice(0, 140))); t.appendChild(tr); });
+    d.appendChild(t); return d;
+  }
+  function wmsInfoUrl(ly, latlng) {
+    const sz = map.getSize(), b = map.getBounds(), crs = map.options.crs;
+    const sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+    const p = map.latLngToContainerPoint(latlng), v13 = ly.version === '1.3.0';
+    const q = new URLSearchParams({ SERVICE: 'WMS', VERSION: ly.version, REQUEST: 'GetFeatureInfo', LAYERS: ly.layers, QUERY_LAYERS: ly.layers, STYLES: '', FORMAT: 'image/png', TRANSPARENT: 'true', INFO_FORMAT: ly.info, FEATURE_COUNT: '5', WIDTH: sz.x, HEIGHT: sz.y, BBOX: [sw.x, sw.y, ne.x, ne.y].join(',') });
+    q.set(v13 ? 'CRS' : 'SRS', 'EPSG:3857');
+    q.set(v13 ? 'I' : 'X', Math.round(p.x)); q.set(v13 ? 'J' : 'Y', Math.round(p.y));
+    return ly.url + (ly.url.includes('?') ? '&' : '?') + q.toString();
+  }
+  function parseInfo(text) {
+    try {
+      const j = JSON.parse(text);
+      const arr = Array.isArray(j.features) ? j.features : (Array.isArray(j) ? j : []);
+      if (arr.length) return arr.map(f => ({ props: f.properties || f.attributes || f }));
+      return [];
+    } catch (e) { /* bukan JSON */ }
+    const t = new DOMParser().parseFromString(text, 'text/html').body.textContent.replace(/\s+/g, ' ').trim();
+    return t ? [{ text: t.slice(0, 600) }] : [];
+  }
+  function infoAt(latlng) {
+    if (!map) return;
+    const box = mk('div', 'pop');
+    box.appendChild(mk('div', 'pop-h', latlng.lat.toFixed(6) + ', ' + latlng.lng.toFixed(6)));
+    let n = 0;
+    const dataLys = layers.filter(l => l.kind === 'data' && l.visible);
+    if (dataLys.length) {
+      needTurf();
+      const pt = turf.point([latlng.lng, latlng.lat]);
+      dataLys.forEach(ly => {
+        let hits = 0;
+        for (const part of ly.parts) {
+          const b = part.bbox;
+          if (latlng.lng < b[0] || latlng.lng > b[2] || latlng.lat < b[1] || latlng.lat > b[3]) continue;
+          if (turf.booleanPointInPolygon(pt, part.poly)) { box.appendChild(propsBlock(ly.name, ly.feats[part.fi].properties || {})); n++; if (++hits >= 3) break; }
+        }
+      });
+    }
+    const wms = layers.filter(l => l.kind === 'wms' && l.visible && l.query);
+    const status = mk('div', 'pop-h', wms.length ? 'Memuat data layanan…' : (n ? '' : 'Tidak ada data layer di titik ini.'));
+    box.appendChild(status);
+    L.popup({ maxWidth: 360, maxHeight: 300 }).setLatLng(latlng).setContent(box).openOn(map);
+    let pending = wms.length;
+    wms.forEach(async ly => {
+      try {
+        const r = await fetch(wmsInfoUrl(ly, latlng));
+        if (!r.ok) throw new Error('http ' + r.status);
+        const items = parseInfo(await r.text());
+        items.forEach(it => { n++; box.insertBefore(it.props ? propsBlock(ly.name, it.props) : (() => { const d = mk('div'); d.append(mk('div', 'pop-t', ly.name), mk('div', '', it.text)); return d; })(), status); });
+      } catch (e) {
+        box.insertBefore(mk('div', 'pop-h', ly.name + ': data klik tidak bisa dibaca dari peramban (server menolak akses atau format info tidak cocok).'), status);
+      } finally {
+        if (--pending === 0) status.textContent = n ? '' : 'Tidak ada data di titik ini.';
+      }
+    });
+  }
+
+  // ----- analisis tumpang-susun -----
+  function queueAnalysis() { clearTimeout(anaTimer); anaTimer = setTimeout(runAnalysis, 250); }
+  function runAnalysis() {
+    const box = $('analysis');
+    lastAna = null;
+    const active = layers.filter(l => l.kind === 'data' && l.analyze && l.parts.length);
+    if (!active.length) { box.innerHTML = ''; return; }
+    const res = state.closed && state.pts.length >= 3 ? analyze(state.pts, { mode: 'latlon' }) : null;
+    if (!res || !res.valid || res.crossings.length) { box.innerHTML = ''; box.appendChild(mk('p', 'hint', 'Analisis tumpang-susun berjalan setelah poligon Anda tertutup dan valid.')); return; }
+    box.innerHTML = ''; box.appendChild(mk('p', 'hint', 'Menghitung tumpang-susun…'));
+    const seq = ++anaSeq;
+    setTimeout(() => {
+      if (seq !== anaSeq) return;
+      try { needTurf(); } catch (e) { box.innerHTML = ''; box.appendChild(mk('p', 'msg', e.message)).dataset.s = 'bad'; return; }
+      const userF = turf.polygon([res.ring.concat([res.ring[0]])]);
+      const uArea = turf.area(userF), ub = turf.bbox(userF);
+      const out = [];
+      for (const ly of active) {
+        const acc = new Map(); let skipped = 0;
+        for (const part of ly.parts) {
+          const b = part.bbox;
+          if (b[0] > ub[2] || b[2] < ub[0] || b[1] > ub[3] || b[3] < ub[1]) continue;
+          let inter = null;
+          try { inter = turf.intersect(userF, part.poly); } catch (e) { skipped++; continue; }
+          if (!inter) continue;
+          const a = turf.area(inter);
+          if (!(a > 0)) continue;
+          const lab = labelOf(ly, ly.feats[part.fi]);
+          acc.set(lab, (acc.get(lab) || 0) + a);
+        }
+        const rows = [...acc].map(([label, a]) => ({ label, m2: a / uArea * res.areaM2, pct: a / uArea * 100 })).sort((x, y) => y.m2 - x.m2);
+        out.push({ ly, rows, skipped, covered: rows.reduce((s, r) => s + r.pct, 0) });
+      }
+      lastAna = { res, out };
+      renderAnalysis();
+    }, 20);
+  }
+  function renderAnalysis() {
+    const box = $('analysis'); box.innerHTML = '';
+    if (!lastAna) return;
+    const { res, out } = lastAna;
+    box.appendChild(mk('h3', '', 'Analisis tumpang-susun poligon Anda (' + f4.format(res.areaHa) + ' ha)'));
+    out.forEach(o => {
+      const d = mk('div', 'ana-ly');
+      d.appendChild(mk('h3', '', o.ly.name + ' · kolom "' + (o.ly.labelField || '-') + '"'));
+      if (!o.rows.length) d.appendChild(mk('p', 'hint', 'Poligon Anda tidak bersinggungan dengan data layer ini.'));
+      o.rows.slice(0, 15).forEach(r => {
+        const row = mk('div', 'arow'), t = mk('div', 't');
+        const sw = mk('i', 'sw'); sw.style.background = colorFor(r.label);
+        t.append(sw, mk('span', 'al', r.label), mk('span', 'av', f2.format(r.m2) + ' m² · ' + f2.format(r.pct) + '%'));
+        const bar = mk('div', 'bar'), fill = mk('i'); fill.style.width = Math.min(100, r.pct) + '%'; fill.style.background = colorFor(r.label);
+        bar.appendChild(fill); row.append(t, bar); d.appendChild(row);
+      });
+      if (o.rows.length > 15) d.appendChild(mk('p', 'hint', '+' + (o.rows.length - 15) + ' nilai lain tidak ditampilkan di sini, lengkapnya ada di CSV.'));
+      if (o.rows.length && o.covered < 99.5) d.appendChild(mk('p', 'hint', 'Di luar data layer: ' + f2.format(100 - o.covered) + '% dari luas poligon.'));
+      if (o.covered > 100.5) d.appendChild(mk('p', 'msg', 'Fitur pada layer ini saling tumpang-tindih, jumlah persen melebihi 100%.')).dataset.s = 'warn';
+      if (o.skipped) d.appendChild(mk('p', 'msg', o.skipped + ' bentuk pada layer ini tidak valid dan dilewati.')).dataset.s = 'warn';
+      if (o.rows.length) {
+        const b = mk('button', 'btn btn-sm', 'Isi kolom Zona RTRW dengan "' + o.rows[0].label.slice(0, 40) + '"'); b.type = 'button';
+        b.addEventListener('click', () => { $('rtrw').value = o.rows[0].label.slice(0, 80); scheduleInfo(); });
+        d.appendChild(b);
+      }
+      box.appendChild(d);
+    });
+    const csv = mk('button', 'btn btn-sm', 'Unduh CSV analisis'); csv.type = 'button';
+    csv.addEventListener('click', () => {
+      const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+      const lines = ['Layer,Kolom,Zona,Luas_m2,Persen'];
+      lastAna.out.forEach(o => o.rows.forEach(r => lines.push([q(o.ly.name), q(o.ly.labelField), q(r.label), r.m2.toFixed(2), r.pct.toFixed(2)].join(','))));
+      download(baseName() + '_analisis.csv', lines.join('\n') + '\n', 'text/csv');
+    });
+    box.appendChild(csv);
+    box.appendChild(mk('p', 'hint', 'Luas dihitung dari irisan poligon di koordinat WGS 84 lalu diskalakan ke luas poligon Anda. Hasil indikatif, selisih kecil dengan hitungan resmi wajar. Hasil resmi KKPR tetap dari OSS.'));
+  }
+
   initMap();
+  loadServices();
+  renderLayers();
   renderAll();
 })();
 </script>
