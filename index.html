@@ -134,6 +134,17 @@ header p { margin: 0; color: var(--muted); max-width: 70ch; }
 .btn-primary:disabled:hover { border-color: var(--accent); color: var(--accent-ink); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+.trtree { list-style: none; margin: 8px 0 0; padding: 0; max-height: 240px; overflow: auto; font-size: 13px; }
+.trtree li { margin: 2px 0; }
+.trtree button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 3px 4px; border-radius: 4px; }
+.trtree button:hover { background: rgba(37,99,235,.12); }
+.trtree ul { list-style: none; padding-left: 16px; margin: 0; }
+.searchbar { position: relative; display: flex; gap: 8px; margin: 0 0 10px; }
+.searchbar input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; font: inherit; background: var(--panel, #fff); color: inherit; }
+.searchres { position: absolute; z-index: 1200; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--panel, #fff); color: inherit; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-height: 260px; overflow: auto; }
+.searchres button { display: block; width: 100%; text-align: left; padding: 9px 12px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.searchres button:hover, .searchres button:focus { background: rgba(37,99,235,.12); }
+.searchres .none { padding: 9px 12px; opacity: .75; }
 #map {
   height: clamp(340px, 62vh, 640px);
   border: 1px solid var(--line); border-radius: 8px;
@@ -267,7 +278,7 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
     <p>Gambar batas lahan di peta satelit, isi data proyek, lalu unduh shapefile poligon dalam satu file ZIP untuk pengajuan OSS-RBA dan PKKPR.</p>
     <div class="tags">
       <span class="tag">WGS 84 · EPSG:4326</span>
-      <span class="tag">.shp .shx .dbf .prj</span>
+      <span class="tag">.shp .shx .dbf .prj .cpg</span>
       <span class="tag">Diproses di peramban, tanpa unggah ke server</span>
     </div>
   </header>
@@ -287,11 +298,17 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <button type="button" class="btn" id="btnClear">Hapus semua</button>
       <span class="sp"></span>
       <div class="seg" role="group" aria-label="Jenis peta">
-        <button type="button" id="bmSat" aria-pressed="true">Satelit</button>
+        <button type="button" id="bmHyb" aria-pressed="true">Satelit + label</button>
+        <button type="button" id="bmSat" aria-pressed="false">Satelit</button>
         <button type="button" id="bmOsm" aria-pressed="false">Peta jalan</button>
       </div>
       <input type="file" id="fileIn" accept=".kml,.kmz,.geojson,.json,.csv,.txt" hidden>
     </div>
+    <form class="searchbar" id="searchForm" role="search">
+      <input id="searchQ" type="search" autocomplete="off" placeholder="Cari lokasi, kawasan industri, atau koordinat (-7.468, 112.440)" aria-label="Cari lokasi">
+      <button type="submit" class="btn" id="btnSearch">Cari</button>
+      <div id="searchRes" class="searchres" hidden></div>
+    </form>
     <div id="map" class="drawing" role="application" aria-label="Peta untuk menggambar batas lahan"></div>
     <div class="mapbar">
       <span class="chip" id="chip" data-s="">WGS 84</span>
@@ -356,6 +373,7 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
     <section class="panel" aria-label="Koordinat dan skala">
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="tabK" aria-selected="true" aria-controls="paneK">Koordinat</button>
+        <button type="button" role="tab" id="tabT" aria-selected="false" aria-controls="paneT">Tata ruang</button>
         <button type="button" role="tab" id="tabL" aria-selected="false" aria-controls="paneL">Ubah luas</button>
         <button type="button" role="tab" id="tabG" aria-selected="false" aria-controls="paneG">Panduan</button>
       </div>
@@ -384,6 +402,54 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
           <button type="button" class="btn btn-primary" id="btnApply">Terapkan ke peta</button>
         </div>
         <p class="msg" id="coordMsg" aria-live="polite"></p>
+      </div>
+
+      <div class="tabpane" id="paneT" role="tabpanel" aria-labelledby="tabT" hidden>
+        <p class="hint">Cek zona RTRW poligon Anda dari layanan ArcGIS REST milik ATR/BPN atau instansi lain. Alat ini mengirim bentuk poligon ke layanan, menerima zona yang bersinggungan, lalu menghitung luas dan persen tiap zona. Hasilnya indikatif dan tidak menggantikan KKPR resmi dari OSS. Pastikan Anda berhak memakai layanan tersebut.</p>
+        <details id="trAgol" open>
+          <summary>Cari layer di ArcGIS Online</summary>
+          <div class="field" style="margin-top: 10px">
+            <label for="agQ">Kata kunci (nama kota atau kabupaten)</label>
+            <input id="agQ" type="search" autocomplete="off" placeholder="pola ruang Kota Mojokerto">
+            <div class="actions" style="margin-top: 8px">
+              <select id="agSort" aria-label="Urutan"><option value="relevance">Paling relevan</option><option value="modified">Terbaru diubah</option><option value="numviews">Paling banyak dilihat</option></select>
+              <button type="button" class="btn btn-sm" id="btnAg">Cari</button>
+            </div>
+            <ul id="agRes" class="trtree" style="max-height: 320px"></ul>
+          </div>
+        </details>
+        <details id="trBrowse">
+          <summary>Belum punya alamat layer? Jelajahi server</summary>
+          <div class="field" style="margin-top: 10px">
+            <label for="trRoot">Alamat induk server (berakhiran /rest/services)</label>
+            <input id="trRoot" type="text" autocomplete="off" spellcheck="false" placeholder="https://contoh.go.id/arcgis/rest/services">
+            <div class="actions" style="margin-top: 8px"><button type="button" class="btn btn-sm" id="btnTrBrowse">Jelajahi</button></div>
+            <ul id="trTree" class="trtree"></ul>
+          </div>
+        </details>
+        <div class="field">
+          <label for="trUrl">Alamat layer (berakhiran /MapServer/nomor)</label>
+          <input id="trUrl" type="text" autocomplete="off" spellcheck="false" placeholder="https://contoh.go.id/arcgis/rest/services/RTRW/MapServer/0">
+        </div>
+        <div class="field">
+          <label for="trField">Kolom nama zona</label>
+          <select id="trField"><option value="">Klik Uji layer untuk memuat daftar kolom</option></select>
+        </div>
+        <details>
+          <summary>Proxy (bila akses langsung ditolak)</summary>
+          <div class="field" style="margin-top: 10px">
+            <label for="trProxy">Awalan alamat proxy</label>
+            <input id="trProxy" type="text" autocomplete="off" spellcheck="false" placeholder="/.netlify/functions/arcgis-proxy?url=">
+            <p class="hint">Dipakai bila peramban menolak akses langsung ke server layanan (CORS). Lihat berkas arcgis-proxy.js yang disertakan.</p>
+          </div>
+        </details>
+        <div class="actions">
+          <button type="button" class="btn" id="btnTrTest">Uji layer</button>
+          <button type="button" class="btn" id="btnTrShow">Tampilkan layer peta</button>
+          <button type="button" class="btn btn-primary" id="btnTrRun">Analisis zona</button>
+        </div>
+        <p class="msg" id="trMsg" aria-live="polite"></p>
+        <div class="ana" id="trResult"></div>
       </div>
 
       <div class="tabpane" id="paneL" role="tabpanel" aria-labelledby="tabL" hidden>
@@ -430,9 +496,10 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
   <section class="panel" aria-label="Data proyek">
     <h2>Data proyek</h2>
     <div class="formgrid">
-      <div class="field"><label for="nama">Nama lahan / proyek</label><input id="nama" type="text" maxlength="80" autocomplete="off"></div>
-      <div class="field"><label for="ket">Keterangan</label><input id="ket" type="text" maxlength="100" autocomplete="off"></div>
-      <div class="field"><label for="rtrw">Zona RTRW (isi manual)</label><input id="rtrw" type="text" maxlength="80" autocomplete="off" placeholder="mis. Kawasan Peruntukan Industri"></div>
+      <div class="field"><label for="nama">Nama lahan / proyek</label><input id="nama" type="text" maxlength="100" autocomplete="off"></div>
+      <div class="field"><label for="ket">Keterangan</label><input id="ket" type="text" maxlength="200" autocomplete="off"></div>
+      <div class="field"><label for="rtrw">Zona RTRW (isi manual)</label><input id="rtrw" type="text" maxlength="150" autocomplete="off" placeholder="mis. Kawasan Peruntukan Industri"></div>
+      <div class="field"><label for="perda">Nomor Perda RTRW</label><input id="perda" type="text" maxlength="150" autocomplete="off" placeholder="mis. Perda Kab./Kota No. 01 Tahun 2024"></div>
     </div>
     <h3>Wilayah administratif</h3>
     <div class="formgrid">
@@ -451,7 +518,7 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <div class="field"><label for="email">Email</label><input id="email" type="email" maxlength="60" autocomplete="email"></div>
       <div class="field"><label for="tel">WhatsApp / telepon</label><input id="tel" type="tel" maxlength="30" autocomplete="tel"></div>
     </div>
-    <label class="check"><input type="checkbox" id="inclApplicant" checked><span>Tulis data pemohon ke tabel atribut (.dbf). Matikan bila file akan dibagikan ke pihak lain dan Anda tidak ingin kontak ikut tercantum.</span></label>
+    <label class="check"><input type="checkbox" id="inclApplicant"><span>Tambahkan kolom ekstra di tabel atribut: keliling dan data pemohon (perusahaan, PIC, email, telepon). Biarkan mati agar kolom persis sama dengan template SHP OSS RBA.</span></label>
     <datalist id="provList"></datalist>
   </section>
 
@@ -780,6 +847,14 @@ function asciiClean(s, max) {
   return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7E]/g, '?').slice(0, max);
 }
 
+function utf8Fit(s, len) {
+  const enc = new TextEncoder().encode(String(s === null || s === undefined ? '' : s));
+  if (enc.length <= len) return enc;
+  let n = len;
+  while (n > 0 && (enc[n] & 0xC0) === 0x80) n--;
+  return enc.subarray(0, n);
+}
+
 function buildDbf(defs, vals, when) {
   const d = when || new Date();
   const headerLen = 32 + 32 * defs.length + 1;
@@ -796,9 +871,12 @@ function buildDbf(defs, vals, when) {
   let o = headerLen;
   buf[o++] = 0x20;
   defs.forEach((f, k) => {
-    const s = f.type === 'N' ? Number(vals[k]).toFixed(f.dec).padStart(f.len, ' ').slice(-f.len)
-                             : asciiClean(vals[k], f.len).padEnd(f.len, ' ');
-    for (let c = 0; c < f.len; c++) buf[o++] = s.charCodeAt(c);
+    let bytes;
+    if (f.type === 'N') {
+      const t = Number(vals[k]).toFixed(f.dec).padStart(f.len, ' ').slice(-f.len);
+      bytes = Array.from(t, ch => ch.charCodeAt(0));
+    } else bytes = utf8Fit(vals[k], f.len);
+    for (let c = 0; c < f.len; c++) buf[o++] = c < bytes.length ? bytes[c] : 0x20;
   });
   buf[o] = 0x1A;
   return buf;
@@ -863,7 +941,8 @@ function buildPackage(res, attrs, base, when) {
   const prj = enc.encode(PRJ_WGS84);
   const files = [
     { name: base + '.shp', data: shp }, { name: base + '.shx', data: shx },
-    { name: base + '.dbf', data: dbf }, { name: base + '.prj', data: prj }
+    { name: base + '.dbf', data: dbf }, { name: base + '.prj', data: prj },
+    { name: base + '.cpg', data: enc.encode('UTF-8\r\n') }
   ];
   return { files, zip: buildZip(files, when) };
 }
@@ -878,7 +957,7 @@ function buildPackage(res, attrs, base, when) {
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
   const state = { pts: [], closed: false };   // pts: [lon, lat]
-  let map = null, group = null, polyLayer = null, esri = null, osm = null;
+  let map = null, group = null, polyLayer = null, esri = null, osm = null, labels = null;
   let dirty = false, lastCloseTs = 0, current = null, timer = 0, armTimer = 0;
 
   // provinsi
@@ -905,7 +984,7 @@ function buildPackage(res, attrs, base, when) {
     if (typeof L === 'undefined') {
       el.classList.remove('drawing');
       el.innerHTML = '<div class="map-fail"><div><strong>Peta tidak bisa dimuat.</strong><br>Periksa koneksi internet. Anda tetap bisa memakai tab Koordinat untuk membuat file.</div></div>';
-      ['btnLocate', 'bmSat', 'bmOsm'].forEach(i => { $(i).disabled = true; });
+      ['btnLocate', 'bmHyb', 'bmSat', 'bmOsm'].forEach(i => { $(i).disabled = true; });
       return;
     }
     map = L.map(el, { doubleClickZoom: false, preferCanvas: true, maxZoom: 19 }).setView([-7.47, 112.43], 10);
@@ -914,6 +993,11 @@ function buildPackage(res, attrs, base, when) {
       maxZoom: 19, maxNativeZoom: 19,
       attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
     }).addTo(map);
+    map.createPane('labels').style.zIndex = 450; map.getPane('labels').style.pointerEvents = 'none';
+    labels = L.layerGroup([
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { pane: 'labels', maxZoom: 19, maxNativeZoom: 19 }),
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { pane: 'labels', maxZoom: 19, maxNativeZoom: 19 })
+    ]).addTo(map);
     osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap contributors'
     });
@@ -923,11 +1007,49 @@ function buildPackage(res, attrs, base, when) {
 
   function setBase(which) {
     if (!map) return;
-    const sat = which === 'sat';
+    const sat = which === 'sat' || which === 'hyb';
     if (sat) { map.removeLayer(osm); esri.addTo(map); } else { map.removeLayer(esri); osm.addTo(map); }
-    $('bmSat').setAttribute('aria-pressed', String(sat));
-    $('bmOsm').setAttribute('aria-pressed', String(!sat));
+    if (which === 'hyb') labels.addTo(map); else map.removeLayer(labels);
+    $('bmHyb').setAttribute('aria-pressed', String(which === 'hyb'));
+    $('bmSat').setAttribute('aria-pressed', String(which === 'sat'));
+    $('bmOsm').setAttribute('aria-pressed', String(which === 'osm'));
   }
+
+  // ---------- pencarian lokasi ----------
+  function parseLatLon(q) {
+    const m = /^\s*(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)\s*$/.exec(q);
+    if (!m) return null;
+    const a = parseFloat(m[1].replace(',', '.')), b = parseFloat(m[2].replace(',', '.'));
+    if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return [a, b];
+    if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return [b, a];
+    return null;
+  }
+  function goTo(lat, lon, zoom) { map.setView([lat, lon], zoom || 17); }
+  $('searchForm').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    const q = $('searchQ').value.trim(), box = $('searchRes');
+    if (!q || !map) return;
+    const ll = parseLatLon(q);
+    if (ll) { goTo(ll[0], ll[1], 18); box.hidden = true; return; }
+    box.hidden = false; box.innerHTML = ''; box.appendChild(mk('div', 'none', 'Mencari…'));
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=id&limit=6&accept-language=id&q=' + encodeURIComponent(q));
+      if (!r.ok) throw new Error('http ' + r.status);
+      const j = await r.json();
+      box.innerHTML = '';
+      if (!j.length) { box.appendChild(mk('div', 'none', 'Tidak ditemukan. Coba nama lain atau ketik koordinat.')); return; }
+      j.forEach(it => {
+        const b = mk('button', '', it.display_name); b.type = 'button';
+        b.addEventListener('click', () => {
+          box.hidden = true;
+          if (it.boundingbox) map.fitBounds([[+it.boundingbox[0], +it.boundingbox[2]], [+it.boundingbox[1], +it.boundingbox[3]]], { maxZoom: 18 });
+          else goTo(+it.lat, +it.lon);
+        });
+        box.appendChild(b);
+      });
+    } catch (e) { box.innerHTML = ''; box.appendChild(mk('div', 'none', 'Pencarian nama tidak bisa dimuat. Anda masih bisa mengetik koordinat.')); }
+  });
+  document.addEventListener('click', ev => { if (!ev.target.closest('#searchForm')) $('searchRes').hidden = true; });
 
   function setMsg(id, text, s) { const m = $(id); m.textContent = text || ''; m.dataset.s = s || ''; }
 
@@ -1142,6 +1264,7 @@ function buildPackage(res, attrs, base, when) {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   });
+  $('bmHyb').addEventListener('click', () => setBase('hyb'));
   $('bmSat').addEventListener('click', () => setBase('sat'));
   $('bmOsm').addEventListener('click', () => setBase('osm'));
   document.addEventListener('keydown', e => {
@@ -1153,12 +1276,12 @@ function buildPackage(res, attrs, base, when) {
 
   // ---------- tab ----------
   function activateTab(k) {
-    ['K', 'L', 'G'].forEach(x => {
+    ['K', 'T', 'L', 'G'].forEach(x => {
       $('tab' + x).setAttribute('aria-selected', String(x === k));
       $('pane' + x).hidden = x !== k;
     });
   }
-  ['K', 'L', 'G'].forEach(x => $('tab' + x).addEventListener('click', () => activateTab(x)));
+  ['K', 'T', 'L', 'G'].forEach(x => $('tab' + x).addEventListener('click', () => activateTab(x)));
 
   $('btnApply').addEventListener('click', () => applyText($('coords').value));
   $('coords').addEventListener('input', () => { dirty = true; setMsg('coordMsg', 'Perubahan belum diterapkan ke peta.', 'warn'); });
@@ -1198,13 +1321,22 @@ function buildPackage(res, attrs, base, when) {
   // ---------- atribut + paket ----------
   function makeAttrs(res) {
     const v = id => $(id).value.trim();
+    // Urutan, nama, tipe, dan lebar kolom mengikuti template SHP OSS RBA.
     const defs = [
-      ['NAMA', 80], ['KETERANGAN', 100], ['PROVINSI', 50], ['KAB_KOTA', 50], ['KECAMATAN', 50], ['DESA_KEL', 50], ['RTRW', 80]
-    ].map(a => ({ name: a[0], type: 'C', len: a[1], dec: 0 }));
-    const vals = [v('nama') || 'Lokasi usaha', v('ket'), v('prov'), v('kab'), v('kec'), v('desa'), v('rtrw')];
-    defs.push({ name: 'LUAS_M2', type: 'N', len: 18, dec: 2 }, { name: 'LUAS_HA', type: 'N', len: 15, dec: 4 }, { name: 'KELILING_M', type: 'N', len: 15, dec: 2 });
-    vals.push(res.areaM2, res.areaHa, res.perimM);
+      { name: 'NAMA', type: 'C', len: 100, dec: 0 },
+      { name: 'LUAS_M2', type: 'N', len: 15, dec: 2 },
+      { name: 'LUAS_HA', type: 'N', len: 12, dec: 6 },
+      { name: 'KELURAHAN', type: 'C', len: 50, dec: 0 },
+      { name: 'KECAMATAN', type: 'C', len: 50, dec: 0 },
+      { name: 'KABKOTA', type: 'C', len: 50, dec: 0 },
+      { name: 'PROVINSI', type: 'C', len: 50, dec: 0 },
+      { name: 'KETERANGAN', type: 'C', len: 200, dec: 0 },
+      { name: 'ZONA_RTRW', type: 'C', len: 150, dec: 0 },
+      { name: 'NO_PERDA', type: 'C', len: 150, dec: 0 }
+    ];
+    const vals = [v('nama') || 'Lokasi usaha', res.areaM2, res.areaHa, v('desa'), v('kec'), v('kab'), v('prov'), v('ket'), v('rtrw'), v('perda')];
     if ($('inclApplicant').checked) {
+      defs.push({ name: 'KELILING_M', type: 'N', len: 15, dec: 2 }); vals.push(res.perimM);
       [['PERUSAHAAN', 80, 'per'], ['PIC', 50, 'pic'], ['EMAIL', 60, 'email'], ['TELEPON', 30, 'tel']].forEach(a => {
         defs.push({ name: a[0], type: 'C', len: a[1], dec: 0 }); vals.push(v(a[2]));
       });
@@ -1303,7 +1435,7 @@ function buildPackage(res, attrs, base, when) {
         res.ring.map((p, i) => '<tr><td>' + (i + 1) + '</td><td>' + p[1].toFixed(6) + '</td><td>' + p[0].toFixed(6) + '</td><td>' + res.proj[i][0].toFixed(2) + '</td><td>' + res.proj[i][1].toFixed(2) + '</td></tr>').join('') + '</tbody></table>';
     } else {
       current = null;
-      $('files').innerHTML = ['.shp', '.shx', '.dbf', '.prj'].map(x => '<li>' + esc(base + x) + '</li>').join('');
+      $('files').innerHTML = ['.shp', '.shx', '.dbf', '.prj', '.cpg'].map(x => '<li>' + esc(base + x) + '</li>').join('');
       $('vtxTable').innerHTML = '<p class="hint">Tabel muncul setelah poligon valid.</p>';
     }
     ['btnDl', 'btnCsv', 'btnCopy', 'btnPdf'].forEach(i => { $(i).disabled = !ready; });
@@ -1402,9 +1534,11 @@ function buildPackage(res, attrs, base, when) {
 
   function addServiceLayer(cfg, persist) {
     if (!map) { setMsg('lyMsg', 'Peta belum tersedia.', 'bad'); return; }
-    cfg.id = nextId++; cfg.kind = cfg.kind === 'xyz' ? 'xyz' : 'wms';
+    cfg.id = nextId++; cfg.kind = ['xyz', 'arcgis'].includes(cfg.kind) ? cfg.kind : 'wms';
     if (cfg.kind === 'wms') {
       cfg.obj = L.tileLayer.wms(cfg.url, { pane: 'data', layers: cfg.layers, version: cfg.version, format: 'image/png', transparent: true, opacity: cfg.opacity, maxZoom: 22 });
+    } else if (cfg.kind === 'arcgis') {
+      cfg.obj = arcgisLayer(cfg);
     } else {
       cfg.obj = L.tileLayer(cfg.url, { pane: 'data', opacity: cfg.opacity, maxZoom: 22 });
     }
@@ -1418,7 +1552,7 @@ function buildPackage(res, attrs, base, when) {
   }
   function saveServices() {
     try {
-      const keep = layers.filter(l => l.kind !== 'data').map(l => ({ kind: l.kind, url: l.url, layers: l.layers, name: l.name, opacity: l.opacity, visible: l.visible, version: l.version, info: l.info, query: l.query }));
+      const keep = layers.filter(l => l.kind !== 'data').map(l => ({ kind: l.kind, url: l.url, layers: l.layers, name: l.name, opacity: l.opacity, visible: l.visible, version: l.version, info: l.info, query: l.query, base: l.base, layerId: l.layerId, proxy: l.proxy }));
       localStorage.setItem('shp_services', JSON.stringify(keep));
     } catch (e) { /* tanpa penyimpanan */ }
   }
@@ -1466,7 +1600,7 @@ function buildPackage(res, attrs, base, when) {
     rg.addEventListener('change', () => { if (ly.kind !== 'data') saveServices(); });
     rl.appendChild(rg); opt.appendChild(rl);
 
-    if (ly.kind === 'wms') {
+    if (ly.kind === 'wms' || ly.kind === 'arcgis') {
       const ql = mk('label'); const qc = mk('input'); qc.type = 'checkbox'; qc.checked = !!ly.query;
       qc.addEventListener('change', () => { ly.query = qc.checked; saveServices(); });
       ql.append(qc, 'Info saat peta diklik'); opt.appendChild(ql);
@@ -1651,16 +1785,23 @@ function buildPackage(res, attrs, base, when) {
         }
       });
     }
-    const wms = layers.filter(l => l.kind === 'wms' && l.visible && l.query);
+    const wms = layers.filter(l => (l.kind === 'wms' || l.kind === 'arcgis') && l.visible && l.query);
     const status = mk('div', 'pop-h', wms.length ? 'Memuat data layanan…' : (n ? '' : 'Tidak ada data layer di titik ini.'));
     box.appendChild(status);
     L.popup({ maxWidth: 360, maxHeight: 300 }).setLatLng(latlng).setContent(box).openOn(map);
     let pending = wms.length;
     wms.forEach(async ly => {
       try {
-        const r = await fetch(wmsInfoUrl(ly, latlng));
-        if (!r.ok) throw new Error('http ' + r.status);
-        const items = parseInfo(await r.text());
+        let items;
+        if (ly.kind === 'arcgis') {
+          const sz = map.getSize(), bb = map.getBounds();
+          const j = await trJson(ly.base + '/identify', { f: 'json', geometry: latlng.lng + ',' + latlng.lat, geometryType: 'esriGeometryPoint', sr: '4326', layers: 'all:' + ly.layerId, tolerance: '3', mapExtent: [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()].join(','), imageDisplay: sz.x + ',' + sz.y + ',96', returnGeometry: 'false' }, ly.proxy || '');
+          items = (j.results || []).map(x => ({ props: x.attributes || {} }));
+        } else {
+          const r = await fetch(wmsInfoUrl(ly, latlng));
+          if (!r.ok) throw new Error('http ' + r.status);
+          items = parseInfo(await r.text());
+        }
         items.forEach(it => { n++; box.insertBefore(it.props ? propsBlock(ly.name, it.props) : (() => { const d = mk('div'); d.append(mk('div', 'pop-t', ly.name), mk('div', '', it.text)); return d; })(), status); });
       } catch (e) {
         box.insertBefore(mk('div', 'pop-h', ly.name + ': data klik tidak bisa dibaca dari peramban (server menolak akses atau format info tidak cocok).'), status);
@@ -1674,7 +1815,7 @@ function buildPackage(res, attrs, base, when) {
   function queueAnalysis() { clearTimeout(anaTimer); anaTimer = setTimeout(runAnalysis, 250); }
   function runAnalysis() {
     const box = $('analysis');
-    lastAna = null;
+    lastAna = null; renderTrSummary();
     const active = layers.filter(l => l.kind === 'data' && l.analyze && l.parts.length);
     if (!active.length) { box.innerHTML = ''; return; }
     const res = state.closed && state.pts.length >= 3 ? analyze(state.pts, { mode: 'latlon' }) : null;
@@ -1709,6 +1850,7 @@ function buildPackage(res, attrs, base, when) {
   }
   function renderAnalysis() {
     const box = $('analysis'); box.innerHTML = '';
+    renderTrSummary();
     if (!lastAna) return;
     const { res, out } = lastAna;
     box.appendChild(mk('h3', '', 'Analisis tumpang-susun poligon Anda (' + f4.format(res.areaHa) + ' ha)'));
@@ -1729,7 +1871,7 @@ function buildPackage(res, attrs, base, when) {
       if (o.skipped) d.appendChild(mk('p', 'msg', o.skipped + ' bentuk pada layer ini tidak valid dan dilewati.')).dataset.s = 'warn';
       if (o.rows.length) {
         const b = mk('button', 'btn btn-sm', 'Isi kolom Zona RTRW dengan "' + o.rows[0].label.slice(0, 40) + '"'); b.type = 'button';
-        b.addEventListener('click', () => { $('rtrw').value = o.rows[0].label.slice(0, 80); scheduleInfo(); });
+        b.addEventListener('click', () => { $('rtrw').value = o.rows[0].label.slice(0, 150); scheduleInfo(); });
         d.appendChild(b);
       }
       box.appendChild(d);
@@ -1743,6 +1885,213 @@ function buildPackage(res, attrs, base, when) {
     });
     box.appendChild(csv);
     box.appendChild(mk('p', 'hint', 'Luas dihitung dari irisan poligon di koordinat WGS 84 lalu diskalakan ke luas poligon Anda. Hasil indikatif, selisih kecil dengan hitungan resmi wajar. Hasil resmi KKPR tetap dari OSS.'));
+  }
+
+  // ---------- tata ruang (ArcGIS REST) ----------
+  const TR_RE = /^(https?:\/\/.+\/(?:MapServer|FeatureServer))\/(\d+)\/?$/i;
+  function trFetch(url, init, proxy) {
+    const px = (proxy === undefined ? $('trProxy').value : proxy || '').trim();
+    return fetch(px ? px + encodeURIComponent(url) : url, init);
+  }
+  async function trJson(url, params, proxy) {
+    let r;
+    try {
+      r = params
+        ? await trFetch(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(params).toString() }, proxy)
+        : await trFetch(url + (url.includes('?') ? '&' : '?') + 'f=json', undefined, proxy);
+    } catch (e) {
+      throw new Error('Peramban tidak bisa mengakses layanan itu. Penyebab umum: server memblokir akses lintas situs (CORS) atau alamat salah. Coba isi Proxy.');
+    }
+    if (!r.ok) throw new Error('Layanan menjawab HTTP ' + r.status + '.');
+    let j;
+    try { j = await r.json(); } catch (e) { throw new Error('Jawaban layanan bukan JSON. Periksa alamat layer.'); }
+    if (j.error) throw new Error((j.error.message || 'Layanan menolak permintaan') + (j.error.details && j.error.details[0] ? ': ' + j.error.details[0] : '') + '.');
+    return j;
+  }
+  function trParse() {
+    const m = TR_RE.exec($('trUrl').value.trim().split('?')[0]);
+    if (!m) { setMsg('trMsg', 'Alamat harus berbentuk https://.../MapServer/nomor, misalnya berakhiran /MapServer/0.', 'bad'); return null; }
+    return { base: m[1], layerId: +m[2], url: m[1] + '/' + m[2] };
+  }
+  function saveTr() { try { localStorage.setItem('shp_tr', JSON.stringify({ url: $('trUrl').value.trim(), proxy: $('trProxy').value.trim(), field: $('trField').value })); } catch (e) { /* abaikan */ } }
+  function loadTr() {
+    try {
+      const c = JSON.parse(localStorage.getItem('shp_tr') || 'null');
+      if (c) { $('trUrl').value = c.url || ''; $('trProxy').value = c.proxy || ''; if (c.field) { const o = mk('option', '', c.field); o.value = c.field; $('trField').appendChild(o); $('trField').value = c.field; } }
+    } catch (e) { /* abaikan */ }
+  }
+  let trMeta = null;
+  $('btnTrTest').addEventListener('click', async () => {
+    const p = trParse(); if (!p) return;
+    setMsg('trMsg', 'Memeriksa layer…');
+    try {
+      const j = await trJson(p.url);
+      trMeta = j;
+      const fl = (j.fields || []).filter(f => f.type === 'esriFieldTypeString').map(f => f.name);
+      const sel = $('trField'); sel.innerHTML = '';
+      (fl.length ? fl : ['']).forEach(n => { const o = mk('option', '', n || '(tidak ada kolom teks)'); o.value = n; sel.appendChild(o); });
+      sel.value = guessLabel(fl) || fl[0] || '';
+      saveTr();
+      const poly = j.geometryType === 'esriGeometryPolygon';
+      setMsg('trMsg', 'Layer "' + (j.name || p.layerId) + '" terbaca, ' + (j.fields || []).length + ' kolom.' + (poly ? ' Pilih kolom nama zona lalu klik Analisis zona.' : ' Peringatan: tipe geometri ' + (j.geometryType || 'tidak diketahui') + ', analisis zona butuh poligon.'), poly ? 'ok' : 'warn');
+    } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+  });
+  $('btnTrShow').addEventListener('click', () => {
+    const p = trParse(); if (!p) return;
+    if (!/MapServer$/i.test(p.base)) { setMsg('trMsg', 'Tampilan layer di peta membutuhkan layanan MapServer.', 'warn'); return; }
+    if (!map) { setMsg('trMsg', 'Peta belum tersedia.', 'bad'); return; }
+    let host = ''; try { host = new URL(p.url).hostname; } catch (e) { /* abaikan */ }
+    addServiceLayer({ kind: 'arcgis', base: p.base, layerId: p.layerId, url: p.url, name: (trMeta && trMeta.name) || ('Tata ruang ' + host), opacity: 0.7, visible: true, query: true, proxy: $('trProxy').value.trim() }, true);
+    saveTr();
+    setMsg('trMsg', 'Layer ditambahkan ke peta. Klik peta untuk melihat atributnya. Atur transparansi di bagian Layer data.', 'ok');
+  });
+
+  // pencarian katalog ArcGIS Online
+  async function agSearch() {
+    const q = $('agQ').value.trim(), ul = $('agRes');
+    if (!q) { setMsg('trMsg', 'Isi kata kunci pencarian.', 'bad'); return; }
+    ul.innerHTML = ''; setMsg('trMsg', 'Mencari di ArcGIS Online…');
+    const so = $('agSort').value;
+    const pr = { q: '(' + q + ') AND (type:"Feature Service" OR type:"Map Service")', num: '30', f: 'json' };
+    if (so !== 'relevance') { pr.sortField = so; pr.sortOrder = 'desc'; }
+    const u = 'https://www.arcgis.com/sharing/rest/search?' + new URLSearchParams(pr).toString();
+    try {
+      const r = await fetch(u); if (!r.ok) throw new Error('http ' + r.status);
+      const j = await r.json();
+      const res = (j.results || []).filter(x => x.url);
+      if (!res.length) { setMsg('trMsg', 'Tidak ada hasil. Coba kata kunci lain, misalnya hanya nama kota.', 'warn'); return; }
+      setMsg('trMsg', res.length + ' layanan ditemukan dari total ' + (j.total || res.length) + '. Klik salah satu untuk memilih. Periksa pemilik dan tanggalnya.', 'ok');
+      res.forEach(x => {
+        const li = mk('li'), b = mk('button'); b.type = 'button';
+        const when = x.modified ? new Date(x.modified).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+        b.append(mk('strong', '', x.title), mk('br'), mk('span', 'hint', x.type + ' · ' + x.owner + ' · diubah ' + when + (x.snippet ? ' · ' + x.snippet.slice(0, 90) : '')));
+        b.addEventListener('click', async () => {
+          setMsg('trMsg', 'Membaca layanan…');
+          try {
+            const m = await trJson(x.url.replace(/\/+$/, ''), undefined, '');
+            const ls = (m.layers || []);
+            const l = ls[0] || { id: 0, name: '' };
+            $('trUrl').value = x.url.replace(/\/+$/, '') + '/' + l.id; $('trField').innerHTML = ''; saveTr();
+            setMsg('trMsg', 'Dipilih: ' + x.title + ' (layer ' + l.id + (l.name ? ' "' + l.name + '"' : '') + ')' + (ls.length > 1 ? '. Layanan ini punya ' + ls.length + ' layer: ' + ls.map(z => z.id + '=' + z.name).join(', ') + ', ubah nomor di kolom alamat bila perlu' : '') + '. Klik Uji layer.', 'ok');
+          } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+        });
+        li.appendChild(b); ul.appendChild(li);
+      });
+    } catch (e) { setMsg('trMsg', 'Pencarian ArcGIS Online gagal dimuat dari peramban Anda. Periksa koneksi internet.', 'bad'); }
+  }
+  $('btnAg').addEventListener('click', agSearch);
+  $('agQ').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); agSearch(); } });
+
+  // penjelajah katalog ArcGIS REST
+  $('btnTrBrowse').addEventListener('click', async () => {
+    const root = $('trRoot').value.trim().replace(/\/+$/, '').split('?')[0], tree = $('trTree');
+    if (!/^https?:\/\/.+\/rest\/services$/i.test(root)) { setMsg('trMsg', 'Alamat induk harus berbentuk https://.../rest/services', 'bad'); return; }
+    setMsg('trMsg', 'Membaca katalog…'); tree.innerHTML = '';
+    const item = (ul, text, fn) => { const li = mk('li'); const b = mk('button', '', text); b.type = 'button'; b.addEventListener('click', () => fn(li)); li.appendChild(b); ul.appendChild(li); return li; };
+    const addLayers = async (li, svcUrl) => {
+      if (li.querySelector('ul')) { li.querySelector('ul').remove(); return; }
+      const ul = mk('ul'); li.appendChild(ul);
+      try {
+        const j = await trJson(svcUrl);
+        (j.layers || []).forEach(l => item(ul, 'Layer ' + l.id + ': ' + l.name, () => { $('trUrl').value = svcUrl + '/' + l.id; $('trField').innerHTML = ''; saveTr(); setMsg('trMsg', 'Layer dipilih. Klik Uji layer.', 'ok'); }));
+        if (!(j.layers || []).length) ul.appendChild(mk('li', 'hint', 'Tidak ada layer.'));
+      } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+    };
+    const addServices = (ul, base, j) => (j.services || []).filter(x => x.type === 'MapServer' || x.type === 'FeatureServer').forEach(x => item(ul, x.name + ' (' + x.type + ')', li => addLayers(li, base + '/' + x.name + '/' + x.type)));
+    try {
+      const j = await trJson(root);
+      addServices(tree, root, j);
+      for (const fo of (j.folders || [])) {
+        item(tree, fo + '/', async li => {
+          if (li.querySelector('ul')) { li.querySelector('ul').remove(); return; }
+          const ul = mk('ul'); li.appendChild(ul);
+          try { addServices(ul, root, await trJson(root + '/' + fo)); } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+        });
+      }
+      setMsg('trMsg', (tree.children.length ? 'Klik folder atau layanan untuk membuka, lalu klik layer yang dipakai. Cari nama seperti RTRW atau Pola Ruang.' : 'Katalog kosong.'), tree.children.length ? 'ok' : 'warn');
+    } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+  });
+
+  function ringSigned(r) { let a = 0; for (let i = 0; i < r.length - 1; i++) a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]; return a / 2; }
+  function esriToGeometry(rings) {
+    const rs = rings.map(r => { const c = r.map(p => [p[0], p[1]]); const a = c[0], z = c[c.length - 1]; if (a[0] !== z[0] || a[1] !== z[1]) c.push([a[0], a[1]]); return c; }).filter(r => r.length >= 4);
+    if (!rs.length) return null;
+    let outers = rs.filter(r => ringSigned(r) < 0), holes = rs.filter(r => ringSigned(r) >= 0);
+    if (!outers.length) { outers = rs; holes = []; }
+    const polys = outers.map(o => [o]);
+    holes.forEach(h => {
+      const pt = turf.point(h[0]);
+      const host = polys.find(pg => { try { return turf.booleanPointInPolygon(pt, turf.polygon([pg[0]])); } catch (e) { return false; } });
+      if (host) host.push(h);
+    });
+    return polys.length === 1 ? { type: 'Polygon', coordinates: polys[0] } : { type: 'MultiPolygon', coordinates: polys };
+  }
+  async function trAnalyze() {
+    const p = trParse(); if (!p) return;
+    const res = state.closed && state.pts.length >= 3 ? analyze(state.pts, { mode: 'latlon' }) : null;
+    if (!res || !res.valid || res.crossings.length) { setMsg('trMsg', 'Gambar poligon yang valid dan tertutup dulu.', 'bad'); return; }
+    needTurf();
+    const b = $('btnTrRun'); b.disabled = true;
+    setMsg('trMsg', 'Mengambil data zona dari layanan…');
+    try {
+      const ring = res.ring.concat([res.ring[0]]);
+      const j = await trJson(p.url + '/query', {
+        f: 'json', where: '1=1', geometry: JSON.stringify({ rings: [ring], spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryPolygon',
+        inSR: '4326', spatialRel: 'esriSpatialRelIntersects', outFields: '*', returnGeometry: 'true', outSR: '4326', geometryPrecision: '7', maxAllowableOffset: '0.000005'
+      });
+      const feats = (j.features || []).filter(f => f.geometry && f.geometry.rings).map(f => ({ type: 'Feature', properties: f.attributes || {}, geometry: esriToGeometry(f.geometry.rings) })).filter(f => f.geometry);
+      layers.filter(l => l.fromTR).forEach(removeLayer);
+      if (!feats.length) { setMsg('trMsg', 'Tidak ada zona yang bersinggungan dengan poligon Anda. Layer mungkin tidak mencakup wilayah ini, atau layernya bukan poligon.', 'warn'); $('trResult').innerHTML = ''; return; }
+      const ly = addDataLayer('Zona RTRW (ArcGIS)', { type: 'FeatureCollection', features: feats });
+      ly.fromTR = true;
+      const field = $('trField').value;
+      if (field && ly.keys.includes(field)) { ly.labelField = field; ly.obj.setStyle(f => styleFor(ly, f)); }
+      renderLayers(); queueAnalysis(); saveTr();
+      setMsg('trMsg', feats.length + ' zona ditemukan di sekitar poligon Anda.' + (j.exceededTransferLimit ? ' Jumlah hasil melewati batas layanan sehingga terpotong, hasil bisa tidak lengkap.' : '') + ' Hasil indikatif.', j.exceededTransferLimit ? 'warn' : 'ok');
+    } catch (e) { setMsg('trMsg', e.message, 'bad'); }
+    b.disabled = false;
+  }
+  $('btnTrRun').addEventListener('click', trAnalyze);
+  $('trField').addEventListener('change', saveTr); $('trUrl').addEventListener('change', saveTr); $('trProxy').addEventListener('change', saveTr);
+
+  function renderTrSummary() {
+    const box = $('trResult'); box.innerHTML = '';
+    if (!lastAna) return;
+    const o = lastAna.out.find(x => x.ly.fromTR);
+    if (!o) return;
+    box.appendChild(mk('h3', '', 'Zona pada lahan (' + f4.format(lastAna.res.areaHa) + ' ha)'));
+    o.rows.slice(0, 8).forEach(r => {
+      const row = mk('div', 'arow'), t = mk('div', 't');
+      const sw = mk('i', 'sw'); sw.style.background = colorFor(r.label);
+      t.append(sw, mk('span', 'al', r.label), mk('span', 'av', f2.format(r.m2) + ' m² · ' + f2.format(r.pct) + '%'));
+      const bar = mk('div', 'bar'), fill = mk('i'); fill.style.width = Math.min(100, r.pct) + '%'; fill.style.background = colorFor(r.label);
+      bar.appendChild(fill); row.append(t, bar); box.appendChild(row);
+    });
+    if (o.covered < 99.5) box.appendChild(mk('p', 'hint', 'Di luar data layer: ' + f2.format(100 - o.covered) + '% dari luas poligon.'));
+    if (o.rows.length) {
+      const b = mk('button', 'btn btn-sm', 'Isi kolom Zona RTRW dengan "' + o.rows[0].label.slice(0, 40) + '"'); b.type = 'button';
+      b.addEventListener('click', () => { $('rtrw').value = o.rows[0].label.slice(0, 150); scheduleInfo(); });
+      box.appendChild(b);
+    }
+  }
+
+  // layer ArcGIS MapServer sebagai gambar dinamis (export)
+  function arcgisLayer(cfg) {
+    const Cls = L.Layer.extend({
+      onAdd(m) { this._m = m; m.on('moveend', this._upd, this); this._upd(); },
+      onRemove(m) { m.off('moveend', this._upd, this); if (this._img) m.removeLayer(this._img); if (this._pend) m.removeLayer(this._pend); this._img = this._pend = null; },
+      setOpacity(o) { cfg.opacity = o; if (this._img) this._img.setOpacity(o); if (this._pend) this._pend.setOpacity(o); },
+      _upd() {
+        const m = this._m, b = m.getBounds(), sz = m.getSize(), crs = m.options.crs, sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+        const url = cfg.base + '/export?' + new URLSearchParams({ bbox: [sw.x, sw.y, ne.x, ne.y].join(','), bboxSR: '3857', imageSR: '3857', size: sz.x + ',' + sz.y, dpi: '96', format: 'png32', transparent: 'true', layers: 'show:' + cfg.layerId, f: 'image' }).toString();
+        const img = L.imageOverlay(url, b, { pane: 'data', opacity: cfg.opacity, interactive: false });
+        if (this._pend) m.removeLayer(this._pend);
+        this._pend = img;
+        img.once('load', () => { if (this._pend !== img) return; if (this._img) m.removeLayer(this._img); this._img = img; this._pend = null; });
+        img.addTo(m);
+      }
+    });
+    return new Cls();
   }
 
   // ---------- wilayah bertingkat ----------
@@ -2046,6 +2395,7 @@ function buildPackage(res, attrs, base, when) {
   initMap();
   loadServices();
   wilInit();
+  loadTr();
   renderLayers();
   renderAll();
 })();
