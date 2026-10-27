@@ -436,11 +436,14 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
     </div>
     <h3>Wilayah administratif</h3>
     <div class="formgrid">
-      <div class="field"><label for="prov">Provinsi</label><input id="prov" type="text" maxlength="50" list="provList" autocomplete="off"></div>
-      <div class="field"><label for="kab">Kabupaten / kota</label><input id="kab" type="text" maxlength="50" autocomplete="off"></div>
-      <div class="field"><label for="kec">Kecamatan</label><input id="kec" type="text" maxlength="50" autocomplete="off"></div>
-      <div class="field"><label for="desa">Kelurahan / desa</label><input id="desa" type="text" maxlength="50" autocomplete="off"></div>
+      <div class="field"><label for="selProv">Provinsi</label><select id="selProv"></select><input id="prov" type="text" maxlength="50" list="provList" autocomplete="off" hidden></div>
+      <div class="field"><label for="selKab">Kabupaten / kota</label><select id="selKab" disabled></select><input id="kab" type="text" maxlength="50" autocomplete="off" hidden></div>
+      <div class="field"><label for="selKec">Kecamatan</label><select id="selKec" disabled></select><input id="kec" type="text" maxlength="50" autocomplete="off" hidden></div>
+      <div class="field"><label for="selDesa">Kelurahan / desa</label><select id="selDesa" disabled></select><input id="desa" type="text" maxlength="50" autocomplete="off" hidden></div>
     </div>
+    <label class="check"><input type="checkbox" id="wilManual"><span>Isi manual (ketik sendiri), misalnya bila wilayah belum ada di daftar.</span></label>
+    <p class="hint" id="wilNote">Daftar wilayah dimuat dari data pihak ketiga (emsifa/api-wilayah-indonesia) dan bisa tertinggal dari pemekaran terbaru.</p>
+    <p class="msg" id="wilMsg" aria-live="polite"></p>
     <h3>Pemohon</h3>
     <div class="formgrid">
       <div class="field"><label for="per">Perusahaan</label><input id="per" type="text" maxlength="80" autocomplete="organization"></div>
@@ -466,10 +469,12 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       </div>
     </div>
     <div class="field"><span class="lab">Isi ZIP</span><ul class="files" id="files"></ul></div>
+    <div class="field" style="max-width: 260px"><label for="pdfBase">Latar peta untuk PDF</label><select id="pdfBase"><option value="sat">Citra satelit</option><option value="osm">Peta jalan</option><option value="none">Tanpa latar</option></select></div>
     <div class="actions">
       <button type="button" class="btn btn-primary" id="btnDl" disabled>Unduh ZIP shapefile</button>
       <button type="button" class="btn" id="btnCsv" disabled>Unduh CSV titik</button>
       <button type="button" class="btn" id="btnCopy" disabled>Salin titik</button>
+      <button type="button" class="btn" id="btnPdf" disabled>Unduh peta PDF (A4)</button>
     </div>
     <p class="msg" id="dlMsg" aria-live="polite"></p>
   </section>
@@ -482,6 +487,7 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.min.js"></script>
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
 
 // ---------- Transverse Mercator (UTM, WGS 84) ----------
@@ -1300,7 +1306,7 @@ function buildPackage(res, attrs, base, when) {
       $('files').innerHTML = ['.shp', '.shx', '.dbf', '.prj'].map(x => '<li>' + esc(base + x) + '</li>').join('');
       $('vtxTable').innerHTML = '<p class="hint">Tabel muncul setelah poligon valid.</p>';
     }
-    ['btnDl', 'btnCsv', 'btnCopy'].forEach(i => { $(i).disabled = !ready; });
+    ['btnDl', 'btnCsv', 'btnCopy', 'btnPdf'].forEach(i => { $(i).disabled = !ready; });
     return res;
   }
 
@@ -1311,12 +1317,14 @@ function buildPackage(res, attrs, base, when) {
     queueAnalysis();
   }
   function scheduleInfo() { clearTimeout(timer); timer = setTimeout(renderInfo, 150); }
+  function flushInfo() { clearTimeout(timer); renderInfo(); }
 
   ['nama', 'ket', 'rtrw', 'prov', 'kab', 'kec', 'desa', 'per', 'pic', 'email', 'tel', 'fname', 'luas'].forEach(id => $(id).addEventListener('input', scheduleInfo));
   ['luasUnit', 'inclApplicant'].forEach(id => $(id).addEventListener('change', scheduleInfo));
   KEEP.forEach(k => $(k).addEventListener('change', () => { try { localStorage.setItem('shp_' + k, $(k).value); } catch (e) { /* abaikan */ } }));
 
   $('btnDl').addEventListener('click', () => {
+    flushInfo();
     if (!current) return;
     download(current.base + '.zip', current.pkg.zip, 'application/zip');
     setMsg('dlMsg', 'ZIP diunduh. Unggah file ZIP ini di OSS tanpa mengekstraknya.', 'ok');
@@ -1325,7 +1333,7 @@ function buildPackage(res, attrs, base, when) {
     const r = current.res;
     return 'No,Lintang,Bujur,Easting,Northing\n' + r.ring.map((p, i) => [i + 1, p[1].toFixed(7), p[0].toFixed(7), r.proj[i][0].toFixed(2), r.proj[i][1].toFixed(2)].join(',')).join('\n') + '\n';
   }
-  $('btnCsv').addEventListener('click', () => { if (current) download(current.base + '_titik.csv', csvText(), 'text/csv'); });
+  $('btnCsv').addEventListener('click', () => { flushInfo(); if (current) download(current.base + '_titik.csv', csvText(), 'text/csv'); });
   $('btnCopy').addEventListener('click', async () => {
     if (!current) return;
     const text = current.res.ring.map(p => p[1].toFixed(7) + ', ' + p[0].toFixed(7)).join('\n');
@@ -1737,8 +1745,307 @@ function buildPackage(res, attrs, base, when) {
     box.appendChild(mk('p', 'hint', 'Luas dihitung dari irisan poligon di koordinat WGS 84 lalu diskalakan ke luas poligon Anda. Hasil indikatif, selisih kecil dengan hitungan resmi wajar. Hasil resmi KKPR tetap dari OSS.'));
   }
 
+  // ---------- wilayah bertingkat ----------
+  const WIL_URL = 'https://emsifa.github.io/api-wilayah-indonesia/api/';
+  const wilCache = new Map();
+  const wilKeys = ['prov', 'kab', 'kec', 'desa'];
+  const wilSel = { prov: $('selProv'), kab: $('selKab'), kec: $('selKec'), desa: $('selDesa') };
+  const wilTxt = { prov: $('prov'), kab: $('kab'), kec: $('kec'), desa: $('desa') };
+  const wilPh = { prov: 'Pilih provinsi', kab: 'Pilih kabupaten / kota', kec: 'Pilih kecamatan', desa: 'Pilih kelurahan / desa' };
+  const wilTitle = s => String(s).toLowerCase().replace(/(^|[\s.\/(-])([a-z])/g, (m, a, c) => a + c.toUpperCase()).replace(/\b(Dki|Di|Ii|Iii|Iv)\b/g, m => m.toUpperCase());
+  async function wilGet(path) {
+    if (wilCache.has(path)) return wilCache.get(path);
+    const r = await fetch(WIL_URL + path + '.json');
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    if (!Array.isArray(j)) throw new Error('format');
+    wilCache.set(path, j);
+    return j;
+  }
+  function wilFill(key, items, text) {
+    const s = wilSel[key]; s.innerHTML = '';
+    const o0 = mk('option', '', text || wilPh[key]); o0.value = ''; s.appendChild(o0);
+    items.forEach(it => { const o = mk('option', '', wilTitle(it.name)); o.value = it.id; s.appendChild(o); });
+    s.disabled = !items.length;
+  }
+  function wilReset(from) {
+    for (let i = from; i < 4; i++) { const k = wilKeys[i]; wilFill(k, []); wilTxt[k].value = ''; }
+  }
+  function applyWilMode() {
+    const manual = $('wilManual').checked;
+    wilKeys.forEach(k => { wilSel[k].hidden = manual; wilTxt[k].hidden = !manual; });
+    $('wilNote').hidden = manual;
+  }
+  async function wilLoadChildren(i, parentId) {
+    const k = wilKeys[i];
+    try {
+      wilFill(k, [], 'Memuat…');
+      wilFill(k, await wilGet(['', 'regencies/', 'districts/', 'villages/'][i] + parentId));
+      setMsg('wilMsg', '');
+    } catch (e) { wilFill(k, []); setMsg('wilMsg', 'Daftar wilayah tidak bisa dimuat. Gunakan "Isi manual".', 'warn'); }
+  }
+  async function wilInit() {
+    wilKeys.forEach((k, i) => wilSel[k].addEventListener('change', () => {
+      const sel = wilSel[k], val = sel.value;
+      wilTxt[k].value = val ? sel.selectedOptions[0].textContent : '';
+      wilTxt[k].dispatchEvent(new Event('input'));
+      wilReset(i + 1);
+      if (val && i < 3) wilLoadChildren(i + 1, val);
+    }));
+    $('wilManual').addEventListener('change', applyWilMode);
+    applyWilMode();
+    try {
+      wilFill('prov', [], 'Memuat…');
+      wilFill('prov', await wilGet('provinces'));
+    } catch (e) {
+      wilFill('prov', []);
+      $('wilManual').checked = true; applyWilMode();
+      setMsg('wilMsg', 'Daftar wilayah tidak bisa dimuat dari internet, jadi diisi manual.', 'warn');
+    }
+  }
+
+  // ---------- peta PDF A4 ----------
+  const MERC_R = 6378137;
+  const mercX = lon => lon * Math.PI / 180 * MERC_R;
+  const mercY = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * MERC_R;
+  const unMercX = x => x / MERC_R * 180 / Math.PI;
+  const unMercY = y => (2 * Math.atan(Math.exp(y / MERC_R)) - Math.PI / 2) * 180 / Math.PI;
+  const lat1 = s => String(s === null || s === undefined ? '' : s).normalize('NFC').replace(/[^\x20-\xFF]/g, '?');
+  function hsl2rgb(h, s, l) {
+    const a = s * Math.min(l, 1 - l);
+    const f = n => { const k = (n + h / 30) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    return [f(0), f(8), f(4)];
+  }
+  const rgbOf = label => hsl2rgb((hashStr(String(label)) * 47) % 360, 0.62, 0.48);
+  const NICE_D = [250, 500, 1000, 1500, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 75000, 100000, 200000, 250000, 500000, 1000000, 2500000];
+  const NICE_M = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000, 20000];
+  const GRAT = [0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2];
+
+  function loadTile(url) {
+    return new Promise(resolve => {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      const t = setTimeout(() => resolve(null), 9000);
+      im.onload = () => { clearTimeout(t); resolve(im); };
+      im.onerror = () => { clearTimeout(t); resolve(null); };
+      im.src = url;
+    });
+  }
+  async function basemapImage(kind, xmin, ymax, W, H) {
+    const ppm = z => 256 * Math.pow(2, z) / (2 * Math.PI * MERC_R);
+    const rangeAt = z => {
+      const p = ppm(z), ox = (xmin + Math.PI * MERC_R) * p, oy = (Math.PI * MERC_R - ymax) * p;
+      return { p, ox, oy, w: W * p, h: H * p, tx0: Math.floor(ox / 256), tx1: Math.floor((ox + W * p) / 256), ty0: Math.floor(oy / 256), ty1: Math.floor((oy + H * p) / 256) };
+    };
+    let z = Math.max(1, Math.min(19, Math.ceil(Math.log2(1100 / (W * ppm(0))))));
+    let r = rangeAt(z);
+    while ((r.tx1 - r.tx0 + 1) * (r.ty1 - r.ty0 + 1) > 64 && z > 1) { z--; r = rangeAt(z); }
+    const jobs = [];
+    for (let ty = r.ty0; ty <= r.ty1; ty++) for (let tx = r.tx0; tx <= r.tx1; tx++) {
+      const url = kind === 'osm' ? 'https://tile.openstreetmap.org/' + z + '/' + tx + '/' + ty + '.png'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/' + z + '/' + ty + '/' + tx;
+      jobs.push(loadTile(url).then(im => ({ im, tx, ty })));
+    }
+    const done = await Promise.all(jobs);
+    const ok = done.filter(d => d.im);
+    if (!ok.length) return null;
+    const cv = document.createElement('canvas'); cv.width = Math.round(r.w); cv.height = Math.round(r.h);
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#d9dedc'; cx.fillRect(0, 0, cv.width, cv.height);
+    ok.forEach(d => cx.drawImage(d.im, d.tx * 256 - r.ox, d.ty * 256 - r.oy, 256, 256));
+    try { return { url: cv.toDataURL('image/jpeg', 0.85), loaded: ok.length, total: done.length }; } catch (e) { return null; }
+  }
+  function degLabel(v, isLon, step) {
+    let dec = 0; while (Math.abs(step * Math.pow(10, dec) - Math.round(step * Math.pow(10, dec))) > 1e-9 && dec < 6) dec++;
+    return Math.abs(v).toFixed(dec) + (isLon ? (v >= 0 ? ' BT' : ' BB') : (v >= 0 ? ' LU' : ' LS'));
+  }
+
+  async function makePdf() {
+    if (!current) return;
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('Pustaka PDF tidak termuat. Periksa koneksi internet lalu muat ulang halaman.');
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const res = current.res, v = id => $(id).value.trim();
+    const nama = v('nama') || 'Lokasi usaha';
+    const M = 10, mx = 13, my = 28, mw = 179, mh = 152;
+    const baseKind = $('pdfBase').value;
+
+    // ekstensi peta (Web Mercator, skala dihitung terhadap jarak sebenarnya)
+    const mp = res.ring.map(p => [mercX(p[0]), mercY(p[1])]);
+    const bx0 = Math.min(...mp.map(p => p[0])), bx1 = Math.max(...mp.map(p => p[0]));
+    const by0 = Math.min(...mp.map(p => p[1])), by1 = Math.max(...mp.map(p => p[1]));
+    const cosLat = Math.cos(res.centroid.lat * Math.PI / 180);
+    const ewG = Math.max((bx1 - bx0) * cosLat, 1), ehG = Math.max((by1 - by0) * cosLat, 1);
+    const D = NICE_D.find(d => ewG * 1.3 * 1000 / d <= mw && ehG * 1.3 * 1000 / d <= mh) || NICE_D[NICE_D.length - 1];
+    const mpm = D / 1000 / cosLat;
+    const xmin = (bx0 + bx1) / 2 - mw / 2 * mpm, ymax = (by0 + by1) / 2 + mh / 2 * mpm, W = mw * mpm, H = mh * mpm;
+    const X = x => mx + (x - xmin) / mpm, Y = y => my + (ymax - y) / mpm;
+    const lon0 = unMercX(xmin), lon1 = unMercX(xmin + W), latT = unMercY(ymax), latB = unMercY(ymax - H);
+    const P = (lon, lat) => [X(mercX(lon)), Y(mercY(lat))];
+    const ring = (pts, style) => { const a = pts; doc.lines(a.slice(1).map((p, i) => [p[0] - a[i][0], p[1] - a[i][1]]), a[0][0], a[0][1], [1, 1], style, true); };
+    const alpha = o => doc.setGState(new doc.GState({ opacity: o }));
+
+    // header
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(16); doc.setTextColor(20, 33, 29);
+    doc.text('PETA LOKASI LAHAN', M, 16);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(60, 75, 70);
+    doc.text(lat1(nama).slice(0, 90), M, 22.5);
+    doc.setFontSize(8.5); doc.text('Skala 1 : ' + D.toLocaleString('id-ID') + ' (A4 landscape)', 287, 16, { align: 'right' });
+    doc.text('Datum WGS 84 (EPSG:4326)', 287, 21, { align: 'right' });
+    doc.setDrawColor(190, 200, 196); doc.setLineWidth(0.2); doc.line(M, 25, 287, 25);
+
+    // latar
+    doc.setFillColor(255, 255, 255); doc.rect(mx, my, mw, mh, 'F');
+    let img = null;
+    if (baseKind !== 'none') img = await basemapImage(baseKind, xmin, ymax, W, H);
+    if (img) doc.addImage(img.url, 'JPEG', mx, my, mw, mh);
+    const bg = !!img;
+
+    // data layer terlihat
+    const fbox = [lon0, latB, lon1, latT];
+    let drawn = 0;
+    alpha(0.38);
+    layers.filter(l => l.kind === 'data' && l.visible).forEach(ly => {
+      for (const part of ly.parts) {
+        if (drawn > 4000) break;
+        const b = part.bbox;
+        if (b[0] > fbox[2] || b[2] < fbox[0] || b[1] > fbox[3] || b[3] < fbox[1]) continue;
+        let geom; try { geom = turf.bboxClip(part.poly, fbox).geometry; } catch (e) { continue; }
+        const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+        const c = rgbOf(labelOf(ly, ly.feats[part.fi]));
+        doc.setFillColor(c[0], c[1], c[2]); doc.setDrawColor(c[0], c[1], c[2]); doc.setLineWidth(0.12);
+        polys.forEach(pc => { const o = pc[0]; if (o && o.length >= 4) { ring(o.map(p => P(p[0], p[1])), 'FD'); drawn++; } });
+      }
+    });
+    alpha(1);
+
+    // grid derajat
+    const span = lon1 - lon0, step = GRAT.find(s => span / s <= 5) || 2;
+    doc.setFontSize(5.5); doc.setTextColor(70, 85, 80);
+    if (bg) doc.setDrawColor(255, 255, 255); else doc.setDrawColor(170, 182, 177);
+    doc.setLineWidth(0.1); alpha(bg ? 0.6 : 0.8);
+    const gl = [];
+    for (let lo = Math.ceil(lon0 / step) * step; lo < lon1; lo += step) { const x = X(mercX(lo)); doc.line(x, my, x, my + mh); gl.push(['x', x, lo]); }
+    for (let la = Math.ceil(latB / step) * step; la < latT; la += step) { const y = Y(mercY(la)); doc.line(mx, y, mx + mw, y); gl.push(['y', y, la]); }
+    alpha(1);
+    gl.forEach(g => {
+      if (g[0] === 'x') doc.text(degLabel(g[2], true, step), g[1], my + mh + 3.4, { align: 'center' });
+      else doc.text(degLabel(g[2], false, step), mx - 1, g[1] + 0.7, { align: 'right' });
+    });
+
+    // poligon pengguna
+    const poly = res.ring.map(p => P(p[0], p[1]));
+    if (bg) {
+      alpha(0.55); doc.setDrawColor(0, 0, 0); doc.setLineWidth(1.1); ring(poly, 'S');
+      alpha(0.22); doc.setFillColor(255, 210, 31); ring(poly, 'F'); alpha(1);
+      doc.setDrawColor(255, 210, 31); doc.setLineWidth(0.5); ring(poly, 'S');
+    } else {
+      alpha(0.18); doc.setFillColor(11, 95, 90); ring(poly, 'F'); alpha(1);
+      doc.setDrawColor(11, 95, 90); doc.setLineWidth(0.5); ring(poly, 'S');
+    }
+    const cxm = poly.reduce((a, p) => a + p[0], 0) / poly.length, cym = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(6);
+    poly.forEach((p, i) => {
+      doc.setFillColor(255, 255, 255); doc.setDrawColor(20, 33, 29); doc.setLineWidth(0.2); doc.circle(p[0], p[1], 0.8, 'FD');
+      if (poly.length > 40) return;
+      let dx = p[0] - cxm, dy = p[1] - cym; const d = Math.hypot(dx, dy) || 1;
+      const tx = p[0] + dx / d * 3, ty = p[1] + dy / d * 3;
+      alpha(0.85); doc.setFillColor(255, 255, 255); doc.roundedRect(tx - 1.7, ty - 1.4, 3.4, 2.8, 0.6, 0.6, 'F'); alpha(1);
+      doc.setTextColor(20, 33, 29); doc.text(String(i + 1), tx, ty + 0.75, { align: 'center' });
+    });
+
+    // skala dan arah utara
+    const bar = NICE_M.filter(m => m * 1000 / D <= 50).pop() || NICE_M[0], bmm = bar * 1000 / D;
+    const sx = mx + 3, sy = my + mh - 11;
+    alpha(0.88); doc.setFillColor(255, 255, 255); doc.rect(sx, sy, bmm + 10, 9, 'F'); alpha(1);
+    doc.setDrawColor(20, 33, 29); doc.setLineWidth(0.2);
+    doc.setFillColor(20, 33, 29); doc.rect(sx + 4, sy + 4, bmm / 2, 1.6, 'FD');
+    doc.setFillColor(255, 255, 255); doc.rect(sx + 4 + bmm / 2, sy + 4, bmm / 2, 1.6, 'FD');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6); doc.setTextColor(20, 33, 29);
+    doc.text('0', sx + 4, sy + 3, { align: 'center' });
+    doc.text(String(bar / 2), sx + 4 + bmm / 2, sy + 3, { align: 'center' });
+    doc.text(bar + ' m', sx + 4 + bmm, sy + 3, { align: 'center' });
+    const nx = mx + mw - 7, ny = my + 12;
+    alpha(0.88); doc.setFillColor(255, 255, 255); doc.rect(nx - 5, ny - 10, 10, 15, 'F'); alpha(1);
+    doc.setFillColor(20, 33, 29); doc.triangle(nx, ny - 8, nx - 2.4, ny, nx + 2.4, ny, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('U', nx, ny + 3.6, { align: 'center' });
+    doc.setDrawColor(20, 33, 29); doc.setLineWidth(0.35); doc.rect(mx, my, mw, mh, 'S');
+
+    // kolom kanan
+    const x0 = 198, cw = 89;
+    let y = my + 2;
+    const head = t => { doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(83, 101, 95); doc.text(t.toUpperCase(), x0, y); doc.setDrawColor(190, 200, 196); doc.setLineWidth(0.2); doc.line(x0, y + 1.2, x0 + cw, y + 1.2); y += 5; };
+    const row = (k, val) => {
+      const lines = doc.splitTextToSize(lat1(val || '-'), cw - 27);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(83, 101, 95); doc.text(k, x0, y);
+      doc.setFontSize(8.5); doc.setTextColor(20, 33, 29); doc.text(lines, x0 + 27, y);
+      y += lines.length * 3.7 + 0.9;
+    };
+    head('Data lahan');
+    row('Nama lahan', nama);
+    row('Perusahaan', v('per'));
+    row('Wilayah', [v('desa'), v('kec'), v('kab'), v('prov')].filter(Boolean).join(', '));
+    row('Luas', f4.format(res.areaHa) + ' ha (' + f0.format(res.areaM2) + ' m2)');
+    row('Keliling', f0.format(res.perimM) + ' m');
+    row('Titik', String(res.count) + ' titik');
+    row('Titik pusat', res.centroid.lat.toFixed(6) + ', ' + res.centroid.lon.toFixed(6));
+    row('Zona UTM', res.zone + (res.south ? ' S' : ' N'));
+    if (v('rtrw')) row('Zona RTRW', v('rtrw'));
+    y += 2;
+
+    // analisis (bila ada dan masih sesuai poligon)
+    const ana = lastAna && Math.abs(lastAna.res.areaM2 - res.areaM2) < 0.01 ? lastAna.out.filter(o => o.rows.length) : [];
+    const anaH = ana.reduce((s, o) => s + 6 + Math.min(4, o.rows.length) * 4, 0);
+    head('Koordinat titik (WGS 84)');
+    const avail = Math.max(3, Math.floor((196 - y - anaH - 6) / 3.5));
+    const show = Math.min(res.count, avail);
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(83, 101, 95);
+    doc.text('No', x0, y); doc.text('Lintang', x0 + 9, y); doc.text('Bujur', x0 + 40, y); y += 3.5;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(20, 33, 29);
+    for (let i = 0; i < show; i++) {
+      doc.text(String(i + 1), x0, y); doc.text(res.ring[i][1].toFixed(6), x0 + 9, y); doc.text(res.ring[i][0].toFixed(6), x0 + 40, y); y += 3.5;
+    }
+    if (show < res.count) { doc.setTextColor(83, 101, 95); doc.text('+ ' + (res.count - show) + ' titik lain, lihat file CSV.', x0, y); y += 3.5; }
+    y += 2;
+    ana.forEach(o => {
+      head('Zona pada lahan: ' + lat1(o.ly.name).slice(0, 34));
+      o.rows.slice(0, 4).forEach(r => {
+        const c = rgbOf(r.label);
+        doc.setFillColor(c[0], c[1], c[2]); doc.rect(x0, y - 2.4, 2.8, 2.8, 'F');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(20, 33, 29);
+        doc.text(doc.splitTextToSize(lat1(r.label), cw - 24)[0], x0 + 4.5, y);
+        doc.text(f2.format(r.pct) + '%', x0 + cw, y, { align: 'right' });
+        y += 4;
+      });
+    });
+
+    // kaki
+    doc.setDrawColor(190, 200, 196); doc.setLineWidth(0.2); doc.line(M, 199, 287, 199);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5); doc.setTextColor(83, 101, 95);
+    doc.text(lat1('Dibuat ' + new Date().toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }) + ' dengan Pembuat Polygon SHP.'), M, 203.5);
+    doc.text('Peta ini hasil penggambaran dan bersifat indikatif, bukan hasil pengukuran atau peta resmi.', M, 207);
+    const attr = img ? (baseKind === 'osm' ? 'Peta dasar: kontributor OpenStreetMap' : 'Citra: Esri, Maxar, Earthstar Geographics' + (img.loaded < img.total ? ' (sebagian ubin tidak termuat)' : '')) : (baseKind === 'none' ? '' : 'Peta dasar tidak termuat, ditampilkan tanpa latar');
+    if (attr) doc.text(attr, 287, 203.5, { align: 'right' });
+    doc.setProperties({ title: 'Peta lokasi lahan - ' + lat1(nama), subject: 'Poligon lahan WGS 84' });
+    return { blob: doc.output('blob'), bgUsed: !!img, baseKind };
+  }
+
+  $('btnPdf').addEventListener('click', async () => {
+    flushInfo();
+    if (!current) return;
+    const b = $('btnPdf'); b.disabled = true;
+    setMsg('dlMsg', 'Menyiapkan peta PDF…');
+    try {
+      const out = await makePdf();
+      download(baseName() + '_peta.pdf', out.blob, 'application/pdf');
+      setMsg('dlMsg', out.baseKind !== 'none' && !out.bgUsed ? 'PDF diunduh tanpa latar karena peta dasar tidak bisa dimuat. Coba lagi atau pilih "Tanpa latar".' : 'PDF peta diunduh.', out.baseKind !== 'none' && !out.bgUsed ? 'warn' : 'ok');
+    } catch (e) {
+      setMsg('dlMsg', 'PDF gagal dibuat: ' + (e && e.message ? e.message : 'kesalahan tidak dikenal') + '.', 'bad');
+    }
+    b.disabled = !current;
+  });
+
   initMap();
   loadServices();
+  wilInit();
   renderLayers();
   renderAll();
 })();
