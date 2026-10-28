@@ -142,6 +142,25 @@ header p { margin: 0; color: var(--muted); max-width: 70ch; }
 #prList li > button:first-child, #pjList li > button:first-child { flex: 1; min-width: 0; }
 #prList li > button + button, #pjList li > button + button { opacity: .75; }
 .trtree ul { list-style: none; padding-left: 16px; margin: 0; }
+.mcard { background: rgba(15,23,32,.88); color: #fff; border-radius: 12px; padding: 10px 14px; min-width: 190px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.35); backdrop-filter: blur(4px); }
+.mcard .mh { display: flex; align-items: center; gap: 10px; justify-content: space-between; font-weight: 600; margin-bottom: 6px; }
+.mcard .mc { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: rgba(148,163,184,.25); }
+.mcard .mc[data-s="ok"] { background: rgba(34,197,94,.25); color: #86efac; }
+.mcard .mc[data-s="bad"] { background: rgba(239,68,68,.25); color: #fca5a5; }
+.mcard .mr { display: flex; gap: 18px; border-top: 1px solid rgba(255,255,255,.15); padding-top: 6px; }
+.mcard .mr small { display: block; font-size: 10px; letter-spacing: .04em; opacity: .7; text-transform: uppercase; }
+.mcard .mr b { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 16px; }
+.mcard .mr b.ha { color: #60a5fa; }
+.mread { background: rgba(15,23,32,.85); color: #e2e8f0; border-radius: 8px; padding: 5px 10px; font: 12px ui-monospace, Menlo, Consolas, monospace; }
+.mlayers { position: relative; }
+.mlayers > button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: rgba(15,23,32,.88); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.mlayers .menu { position: absolute; right: 0; top: 50px; background: rgba(15,23,32,.95); border-radius: 10px; padding: 4px; min-width: 160px; }
+.mlayers .menu button { display: block; width: 100%; text-align: left; background: none; border: 0; color: #fff; padding: 8px 10px; border-radius: 6px; font: 13px inherit; cursor: pointer; }
+.mlayers .menu button[aria-pressed="true"] { background: rgba(37,99,235,.55); }
+.mlayers .menu button:hover { background: rgba(255,255,255,.12); }
+.gset { margin: 10px 0 0; }
+.dim { background: rgba(15,23,32,.82); color: #fff; border-radius: 6px; padding: 1px 6px; font: 600 11px ui-monospace, Menlo, Consolas, monospace; white-space: nowrap; pointer-events: none; border: 1px solid rgba(255,255,255,.25); }
+.dim.ang { background: rgba(255,210,31,.92); color: #1b1b1b; border-color: rgba(0,0,0,.25); }
 .searchbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
 .searchbar input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; font: inherit; background: var(--panel, #fff); color: inherit; }
 .searchres { position: absolute; z-index: 1200; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--panel, #fff); color: inherit; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-height: 260px; overflow: auto; }
@@ -299,11 +318,13 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <button type="button" class="btn" id="btnLocate">Lokasi saya</button>
       <button type="button" class="btn" id="btnImport">Impor KML / KMZ / GeoJSON</button>
       <button type="button" class="btn" id="btnClear">Hapus semua</button>
+      <label class="check" style="margin: 0"><input type="checkbox" id="dimToggle" checked><span>Panjang sisi dan sudut</span></label>
       <span class="sp"></span>
       <div class="seg" role="group" aria-label="Jenis peta">
         <button type="button" id="bmHyb" aria-pressed="true">Satelit + label</button>
         <button type="button" id="bmSat" aria-pressed="false">Satelit</button>
         <button type="button" id="bmOsm" aria-pressed="false">Peta jalan</button>
+        <button type="button" id="bmGoog" aria-pressed="false" hidden>Google</button>
       </div>
       <input type="file" id="fileIn" accept=".kml,.kmz,.geojson,.json,.csv,.txt" hidden>
     </div>
@@ -314,6 +335,19 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <div id="searchRes" class="searchres" hidden></div>
     </form>
     <div id="map" class="drawing" role="application" aria-label="Peta untuk menggambar batas lahan"></div>
+    <details class="gset" id="gset">
+      <summary>Peta Google (opsional, butuh API key sendiri)</summary>
+      <div class="field" style="margin-top: 10px">
+        <label for="gKey">API key Google Maps Platform (Map Tiles API aktif)</label>
+        <input id="gKey" type="password" autocomplete="off" spellcheck="false" placeholder="AIza...">
+        <div class="actions" style="margin-top: 8px">
+          <button type="button" class="btn btn-sm" id="btnGSave">Simpan dan pakai</button>
+          <button type="button" class="btn btn-sm" id="btnGClear">Hapus kunci</button>
+        </div>
+        <p class="msg" id="gMsg" role="status" data-s=""></p>
+        <p class="hint">Kunci disimpan hanya di peramban ini, tidak dikirim ke server mana pun selain Google. Batasi kunci ke alamat situs ini dan aktifkan hanya Map Tiles API. Ubin Google tidak dipakai untuk latar PDF. Pakai sesuai ketentuan Google Maps Platform.</p>
+      </div>
+    </details>
     <div class="mapbar">
       <span class="chip" id="chip" data-s="">WGS 84</span>
       <span class="area" id="mapArea"></span>
@@ -1011,7 +1045,7 @@ function buildPackage(res, attrs, base, when) {
     if (typeof L === 'undefined') {
       el.classList.remove('drawing');
       el.innerHTML = '<div class="map-fail"><div><strong>Peta tidak bisa dimuat.</strong><br>Periksa koneksi internet. Anda tetap bisa memakai tab Koordinat untuk membuat file.</div></div>';
-      ['btnLocate', 'bmHyb', 'bmSat', 'bmOsm'].forEach(i => { $(i).disabled = true; });
+      ['btnLocate', 'bmHyb', 'bmSat', 'bmOsm', 'bmGoog'].forEach(i => { $(i).disabled = true; });
       return;
     }
     map = L.map(el, { doubleClickZoom: false, preferCanvas: true, maxZoom: 19 }).setView([-7.47, 112.43], 10);
@@ -1029,18 +1063,83 @@ function buildPackage(res, attrs, base, when) {
       maxZoom: 19, maxNativeZoom: 19, attribution: '&copy; OpenStreetMap contributors'
     });
     group = L.layerGroup().addTo(map);
+    // kartu info, bacaan koordinat, dan pemilih layer di atas peta
+    const ctl = (pos, build) => { const C = L.Control.extend({ onAdd() { const d = L.DomUtil.create('div'); build(d); L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d; } }); new C({ position: pos }).addTo(map); };
+    ctl('bottomleft', d => { d.className = 'mcard'; d.id = 'mcard'; d.hidden = true; d.innerHTML = '<div class="mh"><span id="mcN"></span><span class="mc" id="mcS"></span></div><div class="mr"><div><small>Luas (m²)</small><b id="mcM"></b></div><div><small>Luas (hektar)</small><b class="ha" id="mcH"></b></div></div>'; });
+    ctl('bottomright', d => { d.className = 'mread'; d.id = 'mread'; d.textContent = 'Lat: - | Lng: - | Z: ' + map.getZoom(); });
+    ctl('topright', d => {
+      d.className = 'mlayers';
+      d.innerHTML = '<button type="button" id="mlBtn" aria-label="Pilih jenis peta" aria-expanded="false"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg></button><div class="menu" id="mlMenu" hidden><button type="button" data-b="hyb">Satelit + label</button><button type="button" data-b="sat">Satelit</button><button type="button" data-b="osm">Peta jalan</button><button type="button" data-b="goog" id="mlGoog" hidden>Google</button></div>';
+      const btn = d.querySelector('#mlBtn'), menu = d.querySelector('#mlMenu');
+      btn.addEventListener('click', () => { menu.hidden = !menu.hidden; btn.setAttribute('aria-expanded', String(!menu.hidden)); });
+      menu.addEventListener('click', e => { const b = e.target.closest('button[data-b]'); if (!b) return; setBase(b.dataset.b); menu.hidden = true; btn.setAttribute('aria-expanded', 'false'); });
+    });
+    const rd = () => document.getElementById('mread');
+    map.on('mousemove', e => { const r = rd(); if (r) r.textContent = 'Lat: ' + e.latlng.lat.toFixed(6) + ' | Lng: ' + e.latlng.lng.toFixed(6) + ' | Z: ' + map.getZoom(); });
+    map.on('zoomend', () => { const r = rd(); if (r) r.textContent = r.textContent.replace(/Z: \d+/, 'Z: ' + map.getZoom()); });
     map.on('click', e => { if (!state.closed) { addPoint(e.latlng.lng, e.latlng.lat); } else { infoAt(e.latlng); } });
   }
 
+  let googLayer = null, googAttr = '', googTimer = 0;
+  function googCopy() {
+    clearTimeout(googTimer);
+    googTimer = setTimeout(async () => {
+      if (!googLayer || !map || !map.hasLayer(googLayer) || !googLayer._sess) return;
+      const b = map.getBounds(), z = Math.round(map.getZoom());
+      try {
+        const r = await fetch('https://tile.googleapis.com/tile/v1/viewport?' + new URLSearchParams({ session: googLayer._sess, key: googLayer._key, zoom: z, north: Math.min(89, b.getNorth()), south: Math.max(-89, b.getSouth()), east: Math.min(179, b.getEast()), west: Math.max(-179, b.getWest()) }));
+        if (!r.ok) return;
+        const j = await r.json();
+        const txt = 'Google Maps' + (j.copyright ? ' · ' + j.copyright : '');
+        if (txt !== googAttr) { if (googAttr) map.attributionControl.removeAttribution(googAttr); googAttr = txt; map.attributionControl.addAttribution(googAttr); }
+      } catch (e) { /* atribusi tetap tampil sebagai "Google Maps" */ }
+    }, 400);
+  }
+  async function googStart(key) {
+    const r = await fetch('https://tile.googleapis.com/v1/createSession?key=' + encodeURIComponent(key), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mapType: 'satellite', language: 'id-ID', region: 'ID', layerTypes: ['layerRoadmap'], overlay: true }) });
+    if (!r.ok) {
+      let m = ''; try { m = (await r.json()).error.message; } catch (e) { /* abaikan */ }
+      throw new Error('Google menolak kunci (HTTP ' + r.status + ')' + (m ? ': ' + m : '') + '. Pastikan Map Tiles API aktif, penagihan aktif, dan pembatasan alamat situs cocok.');
+    }
+    const j = await r.json();
+    if (!j.session) throw new Error('Jawaban Google tidak berisi sesi.');
+    if (googLayer && map.hasLayer(googLayer)) map.removeLayer(googLayer);
+    googLayer = L.tileLayer('https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=' + encodeURIComponent(j.session) + '&key=' + encodeURIComponent(key), { maxZoom: 22, maxNativeZoom: 21 });
+    googLayer._sess = j.session; googLayer._key = key;
+    let bad = 0; googLayer.on('tileerror', () => { if (++bad === 4) setMsg('gMsg', 'Ubin Google gagal dimuat. Kunci salah, kuota habis, atau sesi kedaluwarsa. Klik "Simpan dan pakai" lagi.', 'warn'); });
+    map.on('moveend', googCopy);
+  }
   function setBase(which) {
     if (!map) return;
-    const sat = which === 'sat' || which === 'hyb';
-    if (sat) { map.removeLayer(osm); esri.addTo(map); } else { map.removeLayer(esri); osm.addTo(map); }
-    if (which === 'hyb') labels.addTo(map); else map.removeLayer(labels);
-    $('bmHyb').setAttribute('aria-pressed', String(which === 'hyb'));
-    $('bmSat').setAttribute('aria-pressed', String(which === 'sat'));
-    $('bmOsm').setAttribute('aria-pressed', String(which === 'osm'));
+    if (which === 'goog' && !(googLayer && googLayer._sess)) which = 'hyb';
+    [esri, osm, labels, googLayer].forEach(l => { if (l && map.hasLayer(l)) map.removeLayer(l); });
+    if (which === 'goog') { googLayer.addTo(map); if (!googAttr) { googAttr = 'Google Maps'; map.attributionControl.addAttribution(googAttr); } googCopy(); }
+    else {
+      if (googAttr) { map.attributionControl.removeAttribution(googAttr); googAttr = ''; }
+      if (which === 'osm') osm.addTo(map); else esri.addTo(map);
+      if (which === 'hyb') labels.addTo(map);
+    }
+    ['Hyb', 'Sat', 'Osm', 'Goog'].forEach(k => $('bm' + k).setAttribute('aria-pressed', String(which === k.toLowerCase().replace('goog', 'goog'))));
+    document.querySelectorAll('#mlMenu button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.b === which)));
   }
+  function googUi(on) { $('bmGoog').hidden = !on; $('mlGoog').hidden = !on; }
+  async function googApply(key, quiet) {
+    if (!map) return;
+    setMsg('gMsg', 'Menghubungi Google…');
+    try { await googStart(key); googUi(true); setBase('goog'); setMsg('gMsg', 'Peta Google aktif.', 'ok'); }
+    catch (e) { googUi(false); setMsg('gMsg', quiet ? 'Kunci tersimpan tetapi Google belum menerimanya: ' + e.message : e.message, 'bad'); }
+  }
+  $('btnGSave').addEventListener('click', () => {
+    const k = $('gKey').value.trim();
+    if (!/^[\w-]{20,}$/.test(k)) { setMsg('gMsg', 'Kunci tidak tampak valid. Salin ulang dari Google Cloud Console.', 'bad'); return; }
+    try { localStorage.setItem('shp_gkey', k); } catch (e) { /* tanpa penyimpanan */ }
+    googApply(k, false);
+  });
+  $('btnGClear').addEventListener('click', () => {
+    try { localStorage.removeItem('shp_gkey'); } catch (e) { /* abaikan */ }
+    $('gKey').value = ''; if (googLayer && map.hasLayer(googLayer)) setBase('hyb'); googLayer = null; googUi(false); setMsg('gMsg', 'Kunci dihapus dari peramban ini.', 'ok');
+  });
+  setTimeout(() => { let k = ''; try { k = localStorage.getItem('shp_gkey') || ''; } catch (e) { /* abaikan */ } if (k && map) { $('gKey').value = k; googApply(k, true); } }, 0);
 
   // ---------- pencarian lokasi ----------
   function parseLatLon(q) {
@@ -1158,6 +1257,7 @@ function buildPackage(res, attrs, base, when) {
       m.on('click', () => { if (!state.closed && i === 0 && state.pts.length >= 3) closePoly(); });
       m.on('contextmenu', () => removePoint(i));
       m.on('dblclick', () => { if (Date.now() - lastCloseTs > 700) removePoint(i); });
+      m.on('dragstart', () => { if (dimLayer) { group.removeLayer(dimLayer); dimLayer = null; } });
       m.on('drag', ev => {
         const q = ev.target.getLatLng();
         state.pts[i] = [q.lng, q.lat];
@@ -1167,6 +1267,36 @@ function buildPackage(res, attrs, base, when) {
       m.on('dragend', () => renderAll());
     });
     $('map').classList.toggle('drawing', !state.closed);
+    drawDims();
+  }
+
+  // label panjang sisi (m) dan sudut dalam (derajat)
+  let dimLayer = null;
+  function drawDims() {
+    if (dimLayer) { group.removeLayer(dimLayer); dimLayer = null; }
+    const pts = state.pts;
+    if (!$('dimToggle').checked || pts.length < 2) return;
+    dimLayer = L.layerGroup().addTo(group);
+    const n = pts.length, closed = state.closed && n >= 3, lat0 = pts[0][1];
+    const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+    const xy = pts.map(p => [(p[0] - pts[0][0]) * kx, (p[1] - lat0) * ky]);
+    const edges = closed ? n : n - 1;
+    for (let i = 0; i < edges; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const d = turf.distance(turf.point(a), turf.point(b), { units: 'kilometers' }) * 1000;
+      if (!(d > 0)) continue;
+      L.marker([(a[1] + b[1]) / 2, (a[0] + b[0]) / 2], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'dim-wrap', html: '<span class="dim">' + f2.format(d) + ' m</span>', iconSize: [0, 0] }) }).addTo(dimLayer);
+    }
+    if (!closed) return;
+    let area2 = 0; for (let i = 0; i < n; i++) { const j = (i + 1) % n; area2 += xy[i][0] * xy[j][1] - xy[j][0] * xy[i][1]; }
+    const ccw = area2 > 0;
+    for (let i = 0; i < n; i++) {
+      const c = xy[i], p = xy[(i + n - 1) % n], q = xy[(i + 1) % n];
+      const a = [p[0] - c[0], p[1] - c[1]], b = [q[0] - c[0], q[1] - c[1]];
+      let ang = ccw ? Math.atan2(b[0] * a[1] - b[1] * a[0], b[0] * a[0] + b[1] * a[1]) : Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]);
+      if (ang < 0) ang += 2 * Math.PI;
+      L.marker([pts[i][1], pts[i][0]], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'dim-wrap', html: '<span class="dim ang">' + f2.format(ang * 180 / Math.PI) + '°</span>', iconSize: [0, 0], iconAnchor: [-14, -6] }) }).addTo(dimLayer);
+    }
   }
 
   function fitPts() {
@@ -1314,9 +1444,12 @@ function buildPackage(res, attrs, base, when) {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   });
+  $('dimToggle').addEventListener('change', () => { try { localStorage.setItem('shp_dim', $('dimToggle').checked ? '1' : '0'); } catch (e) { /* abaikan */ } drawDims(); });
+  try { if (localStorage.getItem('shp_dim') === '0') $('dimToggle').checked = false; } catch (e) { /* abaikan */ }
   $('bmHyb').addEventListener('click', () => setBase('hyb'));
   $('bmSat').addEventListener('click', () => setBase('sat'));
   $('bmOsm').addEventListener('click', () => setBase('osm'));
+  $('bmGoog').addEventListener('click', () => setBase('goog'));
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     const t = document.activeElement && document.activeElement.tagName;
@@ -1457,6 +1590,14 @@ function buildPackage(res, attrs, base, when) {
     const chip = $('chip');
     chip.dataset.s = ready ? 'ok' : (n >= 3 ? 'bad' : '');
     chip.textContent = ready ? 'WGS 84 valid' : 'Belum valid';
+    const mc = document.getElementById('mcard');
+    if (mc) {
+      mc.hidden = !n;
+      $('mcN').textContent = n + ' Titik Sudut';
+      $('mcS').textContent = ready ? 'WGS84 Valid' : (n >= 3 ? 'Belum valid' : 'Menggambar'); $('mcS').dataset.s = ready ? 'ok' : (n >= 3 ? 'bad' : '');
+      $('mcM').textContent = res && res.valid ? f2.format(res.areaM2) : '-';
+      $('mcH').textContent = res && res.valid ? f4.format(res.areaHa) : '-';
+    }
     $('mapArea').textContent = res && res.valid ? f4.format(res.areaHa) + ' ha · ' + f0.format(res.areaM2) + ' m²' : '';
     $('mapHint').textContent = !n ? 'Klik peta untuk menaruh titik sudut pertama.'
       : (!state.closed ? (n < 3 ? 'Lanjutkan klik sudut berikutnya. Minimal tiga titik.' : 'Klik titik 1 atau tombol Tutup poligon untuk menyelesaikan. Esc membatalkan.')
