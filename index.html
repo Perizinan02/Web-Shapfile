@@ -138,8 +138,11 @@ header p { margin: 0; color: var(--muted); max-width: 70ch; }
 .trtree li { margin: 2px 0; }
 .trtree button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; text-align: left; padding: 3px 4px; border-radius: 4px; }
 .trtree button:hover { background: rgba(37,99,235,.12); }
+#prList li, #pjList li { display: flex; gap: 8px; align-items: center; }
+#prList li > button:first-child, #pjList li > button:first-child { flex: 1; min-width: 0; }
+#prList li > button + button, #pjList li > button + button { opacity: .75; }
 .trtree ul { list-style: none; padding-left: 16px; margin: 0; }
-.searchbar { position: relative; display: flex; gap: 8px; margin: 0 0 10px; }
+.searchbar { position: relative; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
 .searchbar input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; font: inherit; background: var(--panel, #fff); color: inherit; }
 .searchres { position: absolute; z-index: 1200; top: 100%; left: 0; right: 0; margin-top: 4px; background: var(--panel, #fff); color: inherit; border: 1px solid var(--line, #cbd5e1); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.2); max-height: 260px; overflow: auto; }
 .searchres button { display: block; width: 100%; text-align: left; padding: 9px 12px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
@@ -305,8 +308,9 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
       <input type="file" id="fileIn" accept=".kml,.kmz,.geojson,.json,.csv,.txt" hidden>
     </div>
     <form class="searchbar" id="searchForm" role="search">
-      <input id="searchQ" type="search" autocomplete="off" placeholder="Cari lokasi, kawasan industri, atau koordinat (-7.468, 112.440)" aria-label="Cari lokasi">
+      <input id="searchQ" type="search" autocomplete="off" placeholder="Cari nama tempat, alamat (Jl. Gajah Mada No. 5, Mojokerto), atau koordinat" aria-label="Cari lokasi">
       <button type="submit" class="btn" id="btnSearch">Cari</button>
+      <label class="check" style="flex-basis: 100%; margin: 0"><input type="checkbox" id="searchScope"><span>Batasi ke kabupaten/kota dan provinsi yang sudah diisi di Data proyek</span></label>
       <div id="searchRes" class="searchres" hidden></div>
     </form>
     <div id="map" class="drawing" role="application" aria-label="Peta untuk menggambar batas lahan"></div>
@@ -443,6 +447,15 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
             <p class="hint">Dipakai bila peramban menolak akses langsung ke server layanan (CORS). Lihat berkas arcgis-proxy.js yang disertakan.</p>
           </div>
         </details>
+        <details id="trPresetBox">
+          <summary>Layer tersimpan per lokasi (mill)</summary>
+          <div class="field" style="margin-top: 10px">
+            <label for="prLabel">Nama lokasi untuk layer di atas</label>
+            <input id="prLabel" type="text" maxlength="60" autocomplete="off" placeholder="Mill Mojokerto">
+            <div class="actions" style="margin-top: 8px"><button type="button" class="btn btn-sm" id="btnPrSave">Simpan layer ini</button></div>
+            <ul id="prList" class="trtree"></ul>
+          </div>
+        </details>
         <div class="actions">
           <button type="button" class="btn" id="btnTrTest">Uji layer</button>
           <button type="button" class="btn" id="btnTrShow">Tampilkan layer peta</button>
@@ -478,6 +491,7 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
           <li>Tekan Esc saat menggambar untuk membatalkan titik yang belum ditutup.</li>
           <li>Isi data proyek, pastikan status Siap diunduh, lalu unduh ZIP dan unggah ke OSS tanpa diekstrak.</li>
         </ol>
+        <p class="hint"><strong>Cari lokasi:</strong> ketik nama tempat atau koordinat di kolom pencarian atas peta. <strong>Tata ruang:</strong> di tab Tata ruang, cari layer pola ruang di ArcGIS Online atau jelajahi server ATR/BPN, lalu klik Analisis zona. Hasilnya indikatif, zonasi resmi tetap dari KKPR di OSS. <strong>Proyek tersimpan:</strong> simpan tiap lokasi di bagian Proyek tersimpan agar bisa dibuka lagi.</p>
         <p class="hint">Punya koordinat dari surat ukur atau CAD? Tempel di tab Koordinat. Punya file dari Google Earth? Gunakan tombol Impor.</p>
       </div>
     </section>
@@ -520,6 +534,19 @@ footer p { margin: 0; font-size: 12.5px; color: var(--muted); max-width: 90ch; }
     </div>
     <label class="check"><input type="checkbox" id="inclApplicant"><span>Tambahkan kolom ekstra di tabel atribut: keliling dan data pemohon (perusahaan, PIC, email, telepon). Biarkan mati agar kolom persis sama dengan template SHP OSS RBA.</span></label>
     <datalist id="provList"></datalist>
+  </section>
+
+  <section class="panel" aria-label="Proyek tersimpan">
+    <h2>Proyek tersimpan</h2>
+    <p class="hint">Simpan poligon dan isian formulir untuk tiap lokasi supaya bisa dibuka lagi. Data tersimpan di peramban ini saja. Ekspor ke file JSON untuk cadangan atau pindah komputer.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="btnPjSave">Simpan proyek ini</button>
+      <button type="button" class="btn" id="btnPjExport">Ekspor semua (JSON)</button>
+      <button type="button" class="btn" id="btnPjImport">Impor JSON</button>
+      <input type="file" id="pjFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="msg" id="pjMsg" role="status" data-s=""></p>
+    <ul id="pjList" class="trtree" style="max-height: 320px"></ul>
   </section>
 
   <section class="panel" aria-label="Unduh">
@@ -1024,6 +1051,23 @@ function buildPackage(res, attrs, base, when) {
     if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return [b, a];
     return null;
   }
+  // varian pencarian alamat Indonesia: dari paling lengkap ke paling umum
+  function addrVariants(q) {
+    const scope = $('searchScope').checked ? [$('kab').value.trim(), $('prov').value.trim()].filter(Boolean).join(', ') : '';
+    const add = t => scope && !t.toLowerCase().includes(scope.split(',')[0].toLowerCase()) ? t + ', ' + scope : t;
+    const out = [];
+    const push = t => { t = t.replace(/\s+/g, ' ').replace(/^[,\s]+|[,\s]+$/g, ''); if (t && !out.includes(t)) out.push(t); };
+    push(add(q));
+    const noNum = q.replace(/\b(?:no|nomor|blok|blk)\.?\s*[\w\-\/]+/gi, ' ').replace(/\bRT\.?\s*\d+\s*(?:\/|,|\s)?\s*(?:RW\.?\s*)?\d*/gi, ' ').replace(/\b(?:kel|kelurahan|desa|kec|kecamatan|kab|kabupaten|kota)\.?\s+/gi, ' ').replace(/\bJl\.?\s*/gi, 'Jalan ');
+    const cp = noNum.split(',').map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    push(add(cp.join(', ')));
+    if (cp.length > 2) push(add(cp[0] + ', ' + cp[cp.length - 1]));
+    push(add(cp.map(x => x.replace(/\s\d+[a-z]?$/i, '')).join(', ')));
+    const parts = q.split(',').map(x => x.trim()).filter(Boolean);
+    if (parts.length > 2) { push(parts.slice(-3).join(', ')); push(parts.slice(-2).join(', ')); }
+    else if (parts.length === 2) push(parts[parts.length - 1]);
+    return out;
+  }
   function goTo(lat, lon, zoom) { map.setView([lat, lon], zoom || 17); }
   $('searchForm').addEventListener('submit', async ev => {
     ev.preventDefault();
@@ -1033,12 +1077,18 @@ function buildPackage(res, attrs, base, when) {
     if (ll) { goTo(ll[0], ll[1], 18); box.hidden = true; return; }
     box.hidden = false; box.innerHTML = ''; box.appendChild(mk('div', 'none', 'Mencari…'));
     try {
-      const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=id&limit=6&accept-language=id&q=' + encodeURIComponent(q));
-      if (!r.ok) throw new Error('http ' + r.status);
-      const j = await r.json();
+      const vars = addrVariants(q);
+      let found = [], used = '';
+      for (const v of vars) {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=id&limit=6&accept-language=id&addressdetails=1&q=' + encodeURIComponent(v));
+        if (!r.ok) throw new Error('http ' + r.status);
+        const j = await r.json();
+        if (j.length) { found = j; used = v; break; }
+      }
       box.innerHTML = '';
-      if (!j.length) { box.appendChild(mk('div', 'none', 'Tidak ditemukan. Coba nama lain atau ketik koordinat.')); return; }
-      j.forEach(it => {
+      if (!found.length) { box.appendChild(mk('div', 'none', 'Alamat tidak ditemukan. Coba tulis nama jalan dan kota saja, atau nama kelurahan/kecamatan, atau pakai koordinat. Alamat rinci (nomor rumah) di daerah kecil sering belum ada di peta.')); return; }
+      if (used !== vars[0]) box.appendChild(mk('div', 'none', 'Alamat lengkap tidak ada. Menampilkan hasil untuk "' + used + '".'));
+      found.forEach(it => {
         const b = mk('button', '', it.display_name); b.type = 'button';
         b.addEventListener('click', () => {
           box.hidden = true;
@@ -2094,6 +2144,101 @@ function buildPackage(res, attrs, base, when) {
     return new Cls();
   }
 
+  // ---------- proyek & layer tersimpan ----------
+  const PJ_FIELDS = ['nama', 'ket', 'rtrw', 'perda', 'prov', 'kab', 'kec', 'desa', 'per', 'pic', 'email', 'tel', 'fname'];
+  const lsGet = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k) || 'null'); return Array.isArray(v) ? v : d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+  function renderPresets() {
+    const ul = $('prList'); ul.innerHTML = '';
+    lsGet('shp_trpresets', []).forEach((p, i) => {
+      const li = mk('li');
+      const use = mk('button', '', p.label + ' · ' + (p.url || '').replace(/^https?:\/\//, '').slice(0, 50)); use.type = 'button';
+      use.addEventListener('click', () => {
+        $('trUrl').value = p.url; $('trProxy').value = p.proxy || '';
+        const sel = $('trField'); sel.innerHTML = '';
+        if (p.field) { const o = mk('option', '', p.field); o.value = p.field; sel.appendChild(o); sel.value = p.field; }
+        saveTr(); setMsg('trMsg', 'Layer "' + p.label + '" dipakai. Klik Uji layer bila daftar kolom perlu dimuat ulang, atau langsung Analisis zona.', 'ok');
+      });
+      const del = mk('button', '', 'Hapus'); del.type = 'button'; del.setAttribute('aria-label', 'Hapus layer ' + p.label);
+      del.addEventListener('click', () => { const a = lsGet('shp_trpresets', []); a.splice(i, 1); lsSet('shp_trpresets', a); renderPresets(); });
+      li.append(use, del); ul.appendChild(li);
+    });
+  }
+  $('btnPrSave').addEventListener('click', () => {
+    const label = $('prLabel').value.trim(), url = $('trUrl').value.trim();
+    if (!label) { setMsg('trMsg', 'Isi nama lokasi dulu.', 'bad'); return; }
+    if (!trParse()) return;
+    const a = lsGet('shp_trpresets', []).filter(p => p.label !== label);
+    a.push({ label, url, field: $('trField').value, proxy: $('trProxy').value.trim() });
+    if (!lsSet('shp_trpresets', a)) { setMsg('trMsg', 'Penyimpanan peramban tidak tersedia.', 'bad'); return; }
+    renderPresets(); setMsg('trMsg', 'Layer disimpan untuk "' + label + '".', 'ok');
+  });
+
+  function collectProject() {
+    flushInfo();
+    const f = {}; PJ_FIELDS.forEach(k => { f[k] = $(k).value; });
+    return { name: $('nama').value.trim() || 'Tanpa nama', saved: new Date().toISOString(), pts: state.pts.map(p => [p[0], p[1]]), closed: state.closed, f, incl: $('inclApplicant').checked, tr: { url: $('trUrl').value.trim(), field: $('trField').value, proxy: $('trProxy').value.trim() } };
+  }
+  function openProject(p) {
+    PJ_FIELDS.forEach(k => { $(k).value = (p.f && p.f[k]) || ''; });
+    $('wilManual').checked = true; applyWilMode();
+    $('inclApplicant').checked = !!p.incl;
+    if (p.tr && p.tr.url) {
+      $('trUrl').value = p.tr.url; $('trProxy').value = p.tr.proxy || '';
+      const sel = $('trField'); sel.innerHTML = '';
+      if (p.tr.field) { const o = mk('option', '', p.tr.field); o.value = p.tr.field; sel.appendChild(o); sel.value = p.tr.field; }
+      saveTr();
+    }
+    state.pts = (p.pts || []).map(a => [+a[0], +a[1]]); state.closed = !!p.closed && state.pts.length >= 3; dirty = false;
+    $('inclApplicant').dispatchEvent(new Event('change'));
+    renderAll(); if (state.pts.length) fitPts(); flushInfo();
+    setMsg('pjMsg', 'Proyek "' + p.name + '" dibuka.', 'ok');
+  }
+  function renderProjects() {
+    const ul = $('pjList'); ul.innerHTML = '';
+    const a = lsGet('shp_projects', []);
+    if (!a.length) { ul.appendChild(mk('li', 'hint', 'Belum ada proyek tersimpan.')); return; }
+    a.forEach((p, i) => {
+      const li = mk('li');
+      const when = p.saved ? new Date(p.saved).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+      const open = mk('button', '', p.name + ' · ' + (p.pts || []).length + ' titik · ' + when); open.type = 'button';
+      open.addEventListener('click', () => openProject(p));
+      const del = mk('button', '', 'Hapus'); del.type = 'button'; del.setAttribute('aria-label', 'Hapus proyek ' + p.name);
+      del.addEventListener('click', () => { if (!confirm('Hapus proyek "' + p.name + '"?')) return; const b = lsGet('shp_projects', []); b.splice(i, 1); lsSet('shp_projects', b); renderProjects(); });
+      li.append(open, del); ul.appendChild(li);
+    });
+  }
+  $('btnPjSave').addEventListener('click', () => {
+    const p = collectProject();
+    if (p.pts.length < 3) { setMsg('pjMsg', 'Gambar atau tempel poligon dulu (minimal tiga titik).', 'bad'); return; }
+    const a = lsGet('shp_projects', []), i = a.findIndex(x => x.name === p.name);
+    if (i >= 0) a[i] = p; else a.push(p);
+    if (!lsSet('shp_projects', a)) { setMsg('pjMsg', 'Penyimpanan peramban tidak tersedia. Pakai Ekspor JSON.', 'bad'); return; }
+    renderProjects(); setMsg('pjMsg', (i >= 0 ? 'Proyek "' + p.name + '" diperbarui.' : 'Proyek "' + p.name + '" disimpan.') + ' Nama yang sama menimpa proyek lama.', 'ok');
+  });
+  $('btnPjExport').addEventListener('click', () => {
+    const data = { app: 'polygon-shp-maker', version: 1, projects: lsGet('shp_projects', []), presets: lsGet('shp_trpresets', []) };
+    if (!data.projects.length && !data.presets.length) { setMsg('pjMsg', 'Belum ada yang diekspor.', 'warn'); return; }
+    download('proyek_shp_' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(data, null, 1), 'application/json');
+  });
+  $('btnPjImport').addEventListener('click', () => $('pjFile').click());
+  $('pjFile').addEventListener('change', async ev => {
+    const file = ev.target.files[0]; ev.target.value = '';
+    if (!file) return;
+    try {
+      const d = JSON.parse(await file.text());
+      if (!d || d.app !== 'polygon-shp-maker' || !Array.isArray(d.projects)) throw new Error('bukan file proyek');
+      const ok = p => p && typeof p.name === 'string' && Array.isArray(p.pts) && p.pts.every(a => Array.isArray(a) && isFinite(a[0]) && isFinite(a[1]));
+      const a = lsGet('shp_projects', []); let n = 0;
+      d.projects.filter(ok).forEach(p => { const i = a.findIndex(x => x.name === p.name); if (i >= 0) a[i] = p; else a.push(p); n++; });
+      const pr = lsGet('shp_trpresets', []); let m = 0;
+      (Array.isArray(d.presets) ? d.presets : []).filter(x => x && typeof x.label === 'string' && /^https?:\/\//i.test(x.url || '')).forEach(x => { const i = pr.findIndex(y => y.label === x.label); if (i >= 0) pr[i] = x; else pr.push(x); m++; });
+      lsSet('shp_projects', a); lsSet('shp_trpresets', pr);
+      renderProjects(); renderPresets();
+      setMsg('pjMsg', n + ' proyek dan ' + m + ' layer tersimpan diimpor.', 'ok');
+    } catch (e) { setMsg('pjMsg', 'File tidak bisa dibaca: ' + e.message + '.', 'bad'); }
+  });
+
   // ---------- wilayah bertingkat ----------
   const WIL_URL = 'https://emsifa.github.io/api-wilayah-indonesia/api/';
   const wilCache = new Map();
@@ -2396,6 +2541,7 @@ function buildPackage(res, attrs, base, when) {
   loadServices();
   wilInit();
   loadTr();
+  renderPresets(); renderProjects();
   renderLayers();
   renderAll();
 })();
