@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pembuat SHP Poligon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+/* Layout: peta lebar di kiri dengan statistik dan tabel titik di bawahnya, formulir atribut di kanan. */
+:root{
+  --bg:#f1f3ef; --panel:#ffffff; --ink:#16211c; --muted:#5a665f; --line:#d7dcd5;
+  --accent:#0e6b5b; --accent-ink:#ffffff; --poly:#ff8a1f; --warn:#b3432a; --ok:#1d7a4a;
+  --field:#f7f8f5;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --panel:#171e1a; --ink:#e6ece8; --muted:#97a49c; --line:#2a352f;
+    --accent:#4cc2a8; --accent-ink:#0a1512; --warn:#ef8a70; --ok:#6fd49c; --field:#1d2622;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --panel:#171e1a; --ink:#e6ece8; --muted:#97a49c; --line:#2a352f;
+  --accent:#4cc2a8; --accent-ink:#0a1512; --warn:#ef8a70; --ok:#6fd49c; --field:#1d2622;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--sans);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1280px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+h1{font-size:22px;line-height:1.2;margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;font-size:13px}
+.steps{display:flex;gap:6px;list-style:none;margin:0;padding:0;font-size:12px}
+.steps li{padding:5px 10px;border:1px solid var(--line);border-radius:6px;color:var(--muted);background:var(--panel)}
+.steps li.on{border-color:var(--accent);color:var(--accent);font-weight:600}
+.steps li.done{color:var(--ok);border-color:var(--ok)}
+main{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){main{grid-template-columns:minmax(0,1.55fr) minmax(340px,1fr);align-items:start}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.card h2{font-size:13px;margin:0 0 12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.mapcard{padding:0;overflow:hidden}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--field);color:var(--ink);padding:7px 12px;border-radius:7px}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.primary:disabled{opacity:.5;cursor:not-allowed}
+button.danger:hover{border-color:var(--warn);color:var(--warn)}
+.spacer{flex:1}
+.hint{padding:8px 12px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);background:var(--field)}
+#map{height:min(62vh,560px);min-height:380px;background:#222}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.stat{padding:12px 14px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font:500 17px var(--mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.stat span{font-size:12px;color:var(--muted)}
+@media (max-width:560px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+.tablewrap{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;font:13px var(--mono);font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;background:var(--panel);font-family:var(--sans);font-weight:600;color:var(--muted);font-size:12px}
+tr:last-child td{border-bottom:0}
+td.empty{font-family:var(--sans);color:var(--muted);padding:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.row h2{margin:0}
+label{display:block;font-size:12px;font-weight:600;margin:0 0 4px;color:var(--muted)}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+textarea{resize:vertical;min-height:64px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:420px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.f{margin-bottom:12px;min-width:0}
+.f:last-child{margin-bottom:0}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.msg{margin-top:12px;font-size:13px;min-height:20px}
+.msg.err{color:var(--warn)} .msg.ok{color:var(--ok)}
+.spec{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dlg{padding:18px}
+.dlg h3{margin:0 0 12px;font-size:16px}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button[aria-selected="true"]{border-color:var(--accent);color:var(--accent);font-weight:600}
+.dlgfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.links{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px}
+.links a{color:var(--accent);border:1px solid var(--line);background:var(--field);padding:6px 10px;border-radius:7px;text-decoration:none}
+.links a:hover{border-color:var(--accent)}
+details.custom{border-top:1px solid var(--line);padding-top:12px}
+details.custom summary{cursor:pointer;font-weight:600;color:var(--muted)}
+.clist{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.clist li{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:7px;padding:6px 10px;min-width:0}
+.clist li span{min-width:0;overflow-wrap:anywhere}
+input[type=range]{padding:0;accent-color:var(--accent)}
+.vtx-wrap{background:none;border:0}
+.vtx{display:block;width:12px;height:12px;margin:3px;border-radius:50%;background:#fff;border:2px solid var(--poly);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.vtx.first{width:18px;height:18px;margin:0;background:var(--poly)}
+.leaflet-container{font-family:var(--sans)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Pembuat SHP Poligon</h1>
+    <p class="sub">Gambar batas lahan di peta, isi atribut, unduh ZIP Shapefile WGS84 (EPSG:4326) berisi .shp .shx .dbf .prj</p>
+  </div>
+  <ol class="steps" aria-label="Tahap">
+    <li id="st1" class="on">1 Gambar batas</li>
+    <li id="st2">2 Data proyek</li>
+    <li id="st3">3 Unduh</li>
+  </ol>
+</header>
+
+<main>
+  <div class="col">
+    <section class="card mapcard" aria-label="Peta">
+      <div class="toolbar">
+        <button id="btnLoc" type="button">Lokasi saya</button>
+        <button id="btnImport" type="button">Impor KML / GeoJSON / koordinat</button>
+        <span class="spacer"></span>
+        <button id="btnUndo" type="button">Urungkan</button>
+        <button id="btnClear" type="button" class="danger">Hapus</button>
+      </div>
+      <div class="hint" id="hint" role="status"></div>
+      <div id="map"></div>
+      <div class="stats">
+        <div class="stat"><b id="sArea">0</b><span>Luas (m²)</span></div>
+        <div class="stat"><b id="sHa">0</b><span>Luas (ha)</span></div>
+        <div class="stat"><b id="sPer">0</b><span>Keliling (m)</span></div>
+        <div class="stat"><b id="sN">0</b><span>Titik sudut</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Layer tambahan</h2>
+      <p class="note" style="margin-top:0">Kawasan Hutan dan PIPPIB dari KLHK tersedia di kontrol layer pojok kanan atas peta. Layer lain bisa ditambahkan sendiri di bawah.</p>
+      <div class="f" style="margin-top:12px"><label for="ovOpacity">Transparansi overlay</label>
+        <input type="range" id="ovOpacity" min="20" max="100" value="60"></div>
+
+      <label>Portal resmi ATR/BPN</label>
+      <div class="links">
+        <a href="https://bhumi.atrbpn.go.id/peta" target="_blank" rel="noopener">BHUMI: peta bidang tanah</a>
+        <a href="https://gistaru.atrbpn.go.id/rdtrinteraktif/" target="_blank" rel="noopener">GISTARU: RDTR Interaktif</a>
+        <a href="https://gistaru.atrbpn.go.id/rtronline/" target="_blank" rel="noopener">GISTARU: RTR Online</a>
+        <button id="btnCtr" type="button">Salin titik tengah poligon</button>
+      </div>
+
+      <details class="custom">
+        <summary>Tambah layer WMS atau ArcGIS MapServer</summary>
+        <div class="f" style="margin-top:12px"><label for="cPreset">Preset layanan</label>
+          <select id="cPreset">
+            <option value="">Pilih preset (opsional)</option>
+            <option value="wms|https://bhumi.atrbpn.go.id/geoserver/wms|BHUMI GeoServer">BHUMI GeoServer (WMS)</option>
+            <option value="wms|https://geosvc.atrbpn.go.id/geoserver/wms|GeoSVC ATR/BPN">GeoSVC ATR/BPN (WMS)</option>
+            <option value="arc|https://gistaru.atrbpn.go.id/arcgis/rest/services|GISTARU">GISTARU tata ruang (ArcGIS REST)</option>
+            <option value="arc|https://dki-siap.atrbpn.go.id/server/rest/services|DKI SIAP">DKI Jakarta SIAP (ArcGIS REST)</option>
+            <option value="arc|https://geoportal.menlhk.go.id/server/rest/services|KLHK">Geoportal KLHK (ArcGIS REST)</option>
+          </select></div>
+        <div class="grid2">
+          <div class="f"><label for="cName">Nama layer</label><input id="cName" autocomplete="off" placeholder="Pola ruang kabupaten"></div>
+          <div class="f"><label for="cKind">Jenis</label>
+            <select id="cKind"><option value="wms">WMS (GeoServer)</option><option value="arc">ArcGIS MapServer</option></select></div>
+        </div>
+        <div class="f"><label for="cUrl">URL layanan</label><input id="cUrl" autocomplete="off" placeholder="https://.../wms  atau  https://.../MapServer"></div>
+        <div class="f"><label for="cLayers">Nama layer (WMS, dipisah koma) atau ID layer (ArcGIS, opsional)</label><input id="cLayers" autocomplete="off"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <button id="cBrowse" type="button">Jelajahi layanan / muat daftar layer</button>
+          <button id="cAdd" type="button" class="primary">Tambah ke peta</button>
+        </div>
+        <div id="bBox" hidden style="margin-top:12px">
+          <input id="bFilter" placeholder="Saring daftar..." autocomplete="off" style="margin-bottom:8px">
+          <div id="bList" class="tablewrap" style="max-height:220px"></div>
+        </div>
+        <div id="cMsg" class="msg" role="status"></div>
+        <ul id="cList" class="clist"></ul>
+      </details>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <h2>Daftar koordinat (WGS84)</h2>
+        <button id="btnCopy" type="button">Salin CSV</button>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>#</th><th>Longitude (X)</th><th>Latitude (Y)</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <aside class="col">
+    <section class="card">
+      <div class="row">
+        <h2>Lokasi administratif</h2>
+        <button id="btnGeo" type="button">Isi dari peta</button>
+      </div>
+      <div class="f"><label for="prov">Provinsi</label>
+        <input id="prov" list="provList" autocomplete="off">
+        <datalist id="provList"></datalist></div>
+      <div class="f"><label for="kab">Kabupaten / Kota</label><input id="kab" autocomplete="off"></div>
+      <div class="grid2">
+        <div class="f"><label for="kec">Kecamatan</label><input id="kec" autocomplete="off"></div>
+        <div class="f"><label for="desa">Kelurahan / Desa</label><input id="desa" autocomplete="off"></div>
+      </div>
+      <p class="note">Isi otomatis memakai titik tengah poligon dan hasilnya perkiraan. Periksa sebelum mengunduh.</p>
+    </section>
+
+    <section class="card">
+      <h2>Lahan dan proyek</h2>
+      <div class="f"><label for="nama">Nama lahan / proyek *</label><input id="nama" autocomplete="off"></div>
+      <div class="f"><label for="ket">Keterangan</label><textarea id="ket"></textarea></div>
+      <div class="grid2">
+        <div class="f"><label for="hak">Tipe hak</label>
+          <select id="hak"><option value="">Pilih tipe hak</option><option>SHM</option><option>HGB</option><option>HGU</option><option>HP</option><option>HPL</option><option>WAKAF</option></select></div>
+        <div class="f"><label for="nib">NIB BPN</label><input id="nib" inputmode="numeric" autocomplete="off"></div>
+      </div>
+      <div class="f"><label for="nohak">Nomor hak / sertipikat</label><input id="nohak" autocomplete="off"></div>
+      <div class="f"><label for="luasSert">Luas sertipikat (m²)</label>
+        <div style="display:flex;gap:8px"><input id="luasSert" inputmode="decimal" autocomplete="off"><button id="btnCal" type="button" style="white-space:nowrap">Kalibrasi luas</button></div>
+        <p class="note">Kalibrasi memperbesar atau memperkecil poligon terhadap titik tengahnya sampai luasnya sama dengan angka sertipikat.</p></div>
+    </section>
+
+    <section class="card">
+      <h2>Pemohon</h2>
+      <div class="f"><label for="pt">Perusahaan / badan usaha</label><input id="pt" autocomplete="organization"></div>
+      <div class="f"><label for="pic">Penanggung jawab</label><input id="pic" autocomplete="name"></div>
+      <div class="grid2">
+        <div class="f"><label for="email">Email</label><input id="email" type="email" autocomplete="email"></div>
+        <div class="f"><label for="telp">No. WhatsApp / telepon</label><input id="telp" type="tel" autocomplete="tel"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <button id="btnExport" type="button" class="primary" style="width:100%;padding:11px" disabled>Buat dan unduh SHP</button>
+      <div id="msg" class="msg" role="status"></div>
+      <ul class="spec">
+        <li>Proyeksi EPSG:4326 (WGS84), file .prj ikut dibuat</li>
+        <li>ZIP berisi .shp, .shx, .dbf, .prj</li>
+        <li>Atribut: nama, wilayah, hak tanah, pemohon, luas, keliling</li>
+      </ul>
+      <p class="note"><button id="btnReset" type="button" class="danger" style="padding:4px 10px">Reset draft</button> Draf tersimpan otomatis di browser ini.</p>
+    </section>
+  </aside>
+</main>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg">
+    <h3>Impor batas lahan</h3>
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tabFile" aria-selected="true">Berkas KML / KMZ / GeoJSON</button>
+      <button type="button" role="tab" id="tabText" aria-selected="false">Teks koordinat</button>
+    </div>
+    <div id="paneFile">
+      <label for="file">Pilih berkas .kml, .kmz, .geojson atau .json</label>
+      <input id="file" type="file" accept=".kml,.kmz,.geojson,.json">
+      <p class="note">Poligon pertama di berkas dipakai. Berkas dari Google Earth didukung.</p>
+    </div>
+    <div id="paneText" hidden>
+      <label for="txt">Satu titik per baris: longitude, latitude (minimal 3 titik)</label>
+      <textarea id="txt" rows="8" placeholder="107.1739, -6.3319&#10;107.1751, -6.3319&#10;107.1751, -6.3327"></textarea>
+      <p class="note">Desimal atau derajat-menit-detik (6°19'55&quot;S 107°10'26&quot;E). Urutan lintang dulu dikenali otomatis.</p>
+    </div>
+    <div id="dlgErr" class="msg err"></div>
+    <div class="dlgfoot">
+      <button type="button" id="dlgCancel">Batal</button>
+      <button type="button" id="dlgApply" class="primary">Terapkan ke peta</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+//<CORE>
+const rad = d => d * Math.PI / 180;
+
+function geoArea(p){
+  const n = p.length; if (n < 3) return 0;
+  const R = 6371007.2; let s = 0;
+  for (let i = 0; i < n; i++){
+    const a = p[i], b = p[(i + 1) % n];
+    s += rad(b[0] - a[0]) * (2 + Math.sin(rad(a[1])) + Math.sin(rad(b[1])));
+  }
+  return Math.abs(s * R * R / 2);
+}
+function hav(a, b){
+  const R = 6371008.8, dLat = rad(b[1] - a[1]), dLon = rad(b[0] - a[0]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function perimeter(p, closed){
+  let s = 0;
+  for (let i = 0; i < p.length - 1; i++) s += hav(p[i], p[i+1]);
+  if (closed && p.length > 2) s += hav(p[p.length-1], p[0]);
+  return s;
+}
+function centroid(p){
+  const n = p.length, ox = p[0][0], oy = p[0][1];
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < n; i++){
+    const x1 = p[i][0]-ox, y1 = p[i][1]-oy, x2 = p[(i+1)%n][0]-ox, y2 = p[(i+1)%n][1]-oy;
+    const f = x1*y2 - x2*y1; a += f; cx += (x1+x2)*f; cy += (y1+y2)*f;
+  }
+  if (Math.abs(a) < 1e-20){
+    return [p.reduce((s,q)=>s+q[0],0)/n, p.reduce((s,q)=>s+q[1],0)/n];
+  }
+  a *= 0.5;
+  return [ox + cx/(6*a), oy + cy/(6*a)];
+}
+function scaleToArea(p, target){
+  let q = p.map(v => v.slice());
+  if (!(target > 0) || q.length < 3) return q;
+  const c = centroid(q);
+  for (let it = 0; it < 4; it++){
+    const cur = geoArea(q); if (!cur) break;
+    const k = Math.sqrt(target / cur);
+    q = q.map(v => [c[0] + (v[0]-c[0])*k, c[1] + (v[1]-c[1])*k]);
+  }
+  return q;
+}
+function validLL(lon, lat){ return isFinite(lon) && isFinite(lat) && Math.abs(lon) <= 180 && Math.abs(lat) <= 90; }
+function orderLL(a, b){
+  // default longitude, latitude; swap when the first value can only be a latitude
+  if (Math.abs(a) <= 90 && Math.abs(b) > 90) return [b, a];
+  return [a, b];
+}
+function parseCoordText(t){
+  const out = [];
+  const dmsRe = /(\d+(?:\.\d+)?)\s*°\s*(?:(\d+(?:\.\d+)?)\s*['′’]\s*)?(?:(\d+(?:\.\d+)?)\s*(?:"|″|”|''|’’)\s*)?\s*(LU|LS|BT|BB|[NSEW])?/gi;
+  for (const raw of String(t).split(/\r?\n/)){
+    const line = raw.trim(); if (!line) continue;
+    const m = [...line.matchAll(dmsRe)];
+    if (m.length >= 2){
+      const vals = m.slice(0, 2).map(x => {
+        let v = +x[1] + (x[2] ? +x[2]/60 : 0) + (x[3] ? +x[3]/3600 : 0);
+        const h = (x[4] || '').toUpperCase();
+        if (h === 'S' || h === 'LS' || h === 'W' || h === 'BB') v = -v;
+        return { v, h };
+      });
+      const isLat = h => ['N','S','LU','LS'].includes(h), isLon = h => ['E','W','BT','BB'].includes(h);
+      let lon, lat;
+      if (isLat(vals[0].h) && isLon(vals[1].h)){ lat = vals[0].v; lon = vals[1].v; }
+      else if (isLon(vals[0].h) && isLat(vals[1].h)){ lon = vals[0].v; lat = vals[1].v; }
+      else [lon, lat] = orderLL(vals[0].v, vals[1].v);
+      if (validLL(lon, lat)) out.push([lon, lat]);
+      continue;
+    }
+    const nums = line.split(/[\s,;]+/).filter(Boolean).map(Number).filter(isFinite);
+    if (nums.length >= 2){
+      const [lon, lat] = orderLL(nums[0], nums[1]);
+      if (validLL(lon, lat)) out.push([lon, lat]);
+    }
+  }
+  return dedupeClose(out);
+}
+function dedupeClose(p){
+  if (p.length > 3){
+    const a = p[0], b = p[p.length-1];
+    if (Math.abs(a[0]-b[0]) < 1e-12 && Math.abs(a[1]-b[1]) < 1e-12) p = p.slice(0, -1);
+  }
+  return p;
+}
+
+// ---- Shapefile writer (single polygon, one attribute record) ----
+function signedArea(r){
+  let s = 0;
+  for (let i = 0; i < r.length; i++){ const a = r[i], b = r[(i+1)%r.length]; s += a[0]*b[1] - b[0]*a[1]; }
+  return s / 2;
+}
+function ascii(s, len){
+  const t = String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '?');
+  return t.slice(0, len);
+}
+const WKT_WGS84 = 'GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]]';
+
+// fields: [name, 'C'|'N', length, decimals, value]
+function makeShapefile(ring, fields){
+  let r = ring.map(v => v.slice());
+  if (signedArea(r) > 0) r.reverse();           // exterior ring must be clockwise
+  r.push(r[0].slice());
+  const n = r.length;
+  let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity;
+  for (const [x, y] of r){ xmin = Math.min(xmin,x); xmax = Math.max(xmax,x); ymin = Math.min(ymin,y); ymax = Math.max(ymax,y); }
+  const contentBytes = 48 + 16*n;
+  const shpLen = 100 + 8 + contentBytes;
+
+  const shp = new ArrayBuffer(shpLen), v = new DataView(shp);
+  const header = (dv, lenBytes) => {
+    dv.setInt32(0, 9994, false); dv.setInt32(24, lenBytes/2, false);
+    dv.setInt32(28, 1000, true); dv.setInt32(32, 5, true);
+    dv.setFloat64(36, xmin, true); dv.setFloat64(44, ymin, true);
+    dv.setFloat64(52, xmax, true); dv.setFloat64(60, ymax, true);
+  };
+  header(v, shpLen);
+  v.setInt32(100, 1, false); v.setInt32(104, contentBytes/2, false);
+  v.setInt32(108, 5, true);
+  v.setFloat64(112, xmin, true); v.setFloat64(120, ymin, true);
+  v.setFloat64(128, xmax, true); v.setFloat64(136, ymax, true);
+  v.setInt32(144, 1, true); v.setInt32(148, n, true); v.setInt32(152, 0, true);
+  r.forEach(([x, y], i) => { v.setFloat64(156 + 16*i, x, true); v.setFloat64(164 + 16*i, y, true); });
+
+  const shx = new ArrayBuffer(108), sv = new DataView(shx);
+  header(sv, 108);
+  sv.setInt32(100, 50, false); sv.setInt32(104, contentBytes/2, false);
+
+  const nf = fields.length, headerLen = 32 + 32*nf + 1;
+  const recLen = 1 + fields.reduce((s, f) => s + f[2], 0);
+  const dbf = new Uint8Array(headerLen + recLen + 1), dv = new DataView(dbf.buffer);
+  const now = new Date();
+  dbf[0] = 3; dbf[1] = now.getFullYear() - 1900; dbf[2] = now.getMonth() + 1; dbf[3] = now.getDate();
+  dv.setUint32(4, 1, true); dv.setUint16(8, headerLen, true); dv.setUint16(10, recLen, true);
+  const put = (off, str) => { for (let i = 0; i < str.length; i++) dbf[off + i] = str.charCodeAt(i) & 0x7f; };
+  fields.forEach((f, i) => {
+    const o = 32 + 32*i;
+    put(o, f[0].slice(0, 10)); dbf[o + 11] = f[1].charCodeAt(0); dbf[o + 16] = f[2]; dbf[o + 17] = f[3];
+  });
+  dbf[32 + 32*nf] = 0x0d;
+  let off = headerLen; dbf[off++] = 0x20;
+  for (const f of fields){
+    let s;
+    if (f[1] === 'N'){
+      s = (isFinite(f[4]) ? Number(f[4]).toFixed(f[3]) : '').slice(0, f[2]).padStart(f[2], ' ');
+    } else {
+      s = ascii(f[4], f[2]).padEnd(f[2], ' ');
+    }
+    put(off, s); off += f[2];
+  }
+  dbf[off] = 0x1a;
+
+  return {
+    shp: new Uint8Array(shp), shx: new Uint8Array(shx), dbf,
+    prj: new TextEncoder().encode(WKT_WGS84)
+  };
+}
+//</CORE>
+
+// ---------- UI ----------
+const PROVINSI = ['Aceh','Sumatera Utara','Sumatera Barat','Riau','Kepulauan Riau','Jambi','Sumatera Selatan','Kepulauan Bangka Belitung','Bengkulu','Lampung','DKI Jakarta','Jawa Barat','Banten','Jawa Tengah','DI Yogyakarta','Jawa Timur','Bali','Nusa Tenggara Barat','Nusa Tenggara Timur','Kalimantan Barat','Kalimantan Tengah','Kalimantan Selatan','Kalimantan Timur','Kalimantan Utara','Sulawesi Utara','Gorontalo','Sulawesi Tengah','Sulawesi Barat','Sulawesi Selatan','Sulawesi Tenggara','Maluku','Maluku Utara','Papua','Papua Barat','Papua Barat Daya','Papua Selatan','Papua Tengah','Papua Pegunungan'];
+document.getElementById('provList').innerHTML = PROVINSI.map(p => `<option value="${p}">`).join('');
+
+const $ = id => document.getElementById(id);
+const FIELDS = ['prov','kab','kec','desa','nama','ket','hak','nib','nohak','luasSert','pt','pic','email','telp'];
+const fmt = (n, d = 0) => n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+let pts = [];          // [lon, lat]
+let closed = false;
+let markers = [];
+
+const map = L.map('map', { doubleClickZoom: false, zoomControl: true }).setView([-2.5, 118], 5);
+const esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Citra &copy; Esri, Maxar, Earthstar Geographics' });
+const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' });
+const carto = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '&copy; OpenStreetMap &copy; CARTO' });
+esri.addTo(map);
+const layerCtl = L.control.layers({ 'Citra satelit (Esri)': esri, 'OpenStreetMap': osm, 'Peta terang (Carto)': carto }, {}, { position: 'topright', collapsed: true }).addTo(map);
+L.control.scale({ imperial: false }).addTo(map);
+
+// ---- Overlay: ArcGIS MapServer lewat endpoint /export (EPSG:3857), tanpa plugin ----
+const ArcExport = L.TileLayer.extend({
+  initialize(base, opts){
+    this._arc = String(base).replace(/\/+$/, '').replace(/\/export$/i, '');
+    this._arcLayers = (opts && opts.arcLayers) ? String(opts.arcLayers).replace(/\s+/g, '') : '';
+    L.TileLayer.prototype.initialize.call(this, '', opts);
+  },
+  getTileUrl(c){
+    const W = 20037508.342789244, size = 2 * W / Math.pow(2, c.z);
+    const x0 = -W + c.x * size, y1 = W - c.y * size, x1 = x0 + size, y0 = y1 - size;
+    return `${this._arc}/export?bbox=${x0},${y0},${x1},${y1}&bboxSR=3857&imageSR=3857&size=256,256&dpi=96&format=png32&transparent=true&f=image`
+      + (this._arcLayers ? `&layers=show:${this._arcLayers}` : '');
+  }
+});
+const KLHK = 'https://geoportal.menlhk.go.id/server/rest/services/SIGAP_Interaktif/';
+const opNow = () => (+document.getElementById('ovOpacity').value || 60) / 100;
+const overlayLayers = [];   // semua overlay (bawaan dan kustom), untuk slider transparansi
+function addOverlay(name, layer){
+  overlayLayers.push(layer); layerCtl.addOverlay(layer, name);
+  // beri tahu pengguna bila banyak tile gagal dimuat (URL salah, layer tidak ada, atau server menolak)
+  let errs = 0, timer = null;
+  layer.on('tileerror', () => {
+    errs++;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (errs >= 3 && typeof cSay === 'function') cSay(`Layer "${name}" gagal dimuat (${errs} tile). Cek URL, nama layer, atau coba zoom lain.`, 'err');
+      errs = 0;
+    }, 1200);
+  });
+  layer.on('tileload', () => { errs = 0; });
+}
+addOverlay('Kawasan Hutan (KLHK)', new ArcExport(KLHK + 'Kawasan_Hutan/MapServer', { opacity: .6, maxZoom: 19, attribution: 'KLHK' }));
+addOverlay('PIPPIB 2023 periode 2 (KLHK)', new ArcExport(KLHK + 'PIPPIB_2023_Periode_2/MapServer', { opacity: .6, maxZoom: 19, attribution: 'KLHK' }));
+
+const polyStyle = { color: '#ff8a1f', weight: 3, fillColor: '#ff8a1f', fillOpacity: .22 };
+const poly = L.polygon([], polyStyle);
+const line = L.polyline([], { color: '#ff8a1f', weight: 3 });
+const rubber = L.polyline([], { color: '#ff8a1f', weight: 2, dashArray: '5 6', opacity: .9, interactive: false });
+
+const mkIcon = first => L.divIcon({ className: 'vtx-wrap', html: `<span class="vtx${first ? ' first' : ''}"></span>`, iconSize: first ? [18, 18] : [18, 18], iconAnchor: [9, 9] });
+const ll = () => pts.map(p => [p[1], p[0]]);
+
+function updateShape(){
+  if (closed && pts.length >= 3){ poly.setLatLngs(ll()); if (!map.hasLayer(poly)) poly.addTo(map); line.remove(); }
+  else { poly.remove(); line.setLatLngs(ll()); if (!map.hasLayer(line)) line.addTo(map); }
+}
+
+function render(){
+  markers.forEach(m => m.remove()); markers = [];
+  updateShape();
+  pts.forEach((p, i) => {
+    const first = i === 0 && !closed && pts.length >= 3;
+    const m = L.marker([p[1], p[0]], { draggable: true, icon: mkIcon(first), keyboard: false }).addTo(map);
+    m.on('click', () => { if (first){ closed = true; rubber.remove(); render(); } });
+    m.on('drag', e => { pts[i] = [e.latlng.lng, e.latlng.lat]; updateShape(); stats(); });
+    m.on('dragend', () => { renderTable(); save(); });
+    m.on('dblclick', e => {
+      L.DomEvent.stop(e);
+      if (pts.length > 3 || (!closed && pts.length > 0)){ pts.splice(i, 1); if (pts.length < 3) closed = false; render(); }
+    });
+    markers.push(m);
+  });
+  stats(); renderTable(); save();
+}
+
+function stats(){
+  const a = geoArea(pts), p = perimeter(pts, closed || pts.length >= 3);
+  $('sArea').textContent = fmt(a, 2);
+  $('sHa').textContent = fmt(a / 10000, 4);
+  $('sPer').textContent = fmt(p, 2);
+  $('sN').textContent = pts.length;
+  let h;
+  if (!pts.length) h = 'Klik peta untuk menambah titik sudut batas lahan.';
+  else if (!closed && pts.length < 3) h = 'Tambah titik lagi. Poligon butuh minimal 3 titik.';
+  else if (!closed) h = 'Klik titik pertama (lingkaran besar) untuk menutup poligon.';
+  else h = 'Poligon tertutup. Seret titik untuk menggeser, klik dua kali pada titik untuk menghapusnya.';
+  $('hint').textContent = h;
+  const ready = pts.length >= 3;
+  $('btnExport').disabled = !ready;
+  const named = $('nama').value.trim().length > 0;
+  $('st1').className = ready && closed ? 'done' : 'on';
+  $('st2').className = !ready || !closed ? '' : (named ? 'done' : 'on');
+  $('st3').className = ready && closed && named ? 'on' : '';
+}
+
+function renderTable(){
+  $('tbody').innerHTML = pts.length
+    ? pts.map((p, i) => `<tr><td>${i + 1}</td><td>${p[0].toFixed(6)}</td><td>${p[1].toFixed(6)}</td></tr>`).join('')
+    : '<tr><td class="empty" colspan="3">Belum ada titik. Gambar poligon di peta.</td></tr>';
+}
+
+map.on('click', e => {
+  if (closed) return;
+  pts.push([e.latlng.lng, e.latlng.lat]); render();
+});
+map.on('mousemove', e => {
+  if (closed || !pts.length){ rubber.remove(); return; }
+  const last = pts[pts.length - 1];
+  rubber.setLatLngs([[last[1], last[0]], e.latlng]);
+  if (!map.hasLayer(rubber)) rubber.addTo(map);
+});
+map.getContainer().addEventListener('mouseleave', () => rubber.remove());
+
+function undo(){
+  if (!pts.length) return;
+  if (closed){ closed = false; } else { pts.pop(); }
+  render();
+}
+function clearAll(){ pts = []; closed = false; rubber.remove(); render(); }
+$('btnUndo').onclick = undo;
+$('btnClear').onclick = clearAll;
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if (e.key === 'Escape' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')){ e.preventDefault(); undo(); }
+});
+
+function fitPoly(){
+  if (pts.length) map.fitBounds(L.latLngBounds(ll()), { padding: [40, 40], maxZoom: 19 });
+}
+
+$('btnLoc').onclick = () => {
+  if (!navigator.geolocation){ say('Browser ini tidak mendukung lokasi.', 'err'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => map.setView([pos.coords.latitude, pos.coords.longitude], 17),
+    () => say('Lokasi tidak bisa diambil. Izinkan akses lokasi di browser.', 'err'),
+    { enableHighAccuracy: true, timeout: 10000 });
+};
+
+$('btnCopy').onclick = async () => {
+  if (!pts.length) return;
+  const csv = 'no,longitude,latitude\n' + pts.map((p, i) => `${i + 1},${p[0].toFixed(6)},${p[1].toFixed(6)}`).join('\n');
+  try { await navigator.clipboard.writeText(csv); say('Koordinat CSV disalin.', 'ok'); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = csv; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); say('Koordinat CSV disalin.', 'ok'); } catch (_) { say('Gagal menyalin.', 'err'); }
+    ta.remove();
+  }
+};
+
+function say(t, cls){ const m = $('msg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
+
+// ---- Calibration ----
+$('btnCal').onclick = () => {
+  const target = parseFloat(String($('luasSert').value).replace(/\./g, '').replace(',', '.')) ;
+  if (pts.length < 3){ say('Gambar poligon dulu sebelum kalibrasi.', 'err'); return; }
+  if (!(target > 0)){ say('Isi luas sertipikat dalam m².', 'err'); return; }
+  const before = geoArea(pts);
+  pts = scaleToArea(pts, target);
+  closed = true; render();
+  say(`Luas disesuaikan dari ${fmt(before, 2)} m² ke ${fmt(geoArea(pts), 2)} m².`, 'ok');
+};
+
+// ---- Reverse geocode (best effort) ----
+$('btnGeo').onclick = async () => {
+  if (pts.length < 3){ say('Gambar poligon dulu agar titik tengahnya diketahui.', 'err'); return; }
+  const c = centroid(pts);
+  say('Mencari wilayah administratif...', '');
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&accept-language=id&zoom=18&lat=${c[1]}&lon=${c[0]}`);
+    const j = await r.json(), a = j.address || {};
+    const set = (id, v) => { if (v) $(id).value = v; };
+    set('prov', a.state);
+    set('kab', a.county || a.city || a.regency || a.town);
+    set('kec', a.municipality || a.city_district || a.suburb);
+    set('desa', a.village || a.neighbourhood || a.quarter || a.suburb);
+    save(); say('Wilayah terisi. Periksa kembali kebenarannya.', 'ok');
+  } catch (e) { say('Gagal mengambil data wilayah. Isi manual.', 'err'); }
+};
+
+// ---- Import ----
+const dlg = $('dlg');
+function tab(which){
+  $('tabFile').setAttribute('aria-selected', which === 'file');
+  $('tabText').setAttribute('aria-selected', which === 'text');
+  $('paneFile').hidden = which !== 'file'; $('paneText').hidden = which !== 'text';
+  $('dlgErr').textContent = '';
+}
+$('btnImport').onclick = () => { tab('file'); dlg.showModal(); };
+$('tabFile').onclick = () => tab('file');
+$('tabText').onclick = () => tab('text');
+$('dlgCancel').onclick = () => dlg.close();
+
+function firstRingFromGeoJSON(g){
+  if (!g) return null;
+  if (g.type === 'FeatureCollection') { for (const f of g.features || []){ const r = firstRingFromGeoJSON(f); if (r) return r; } return null; }
+  if (g.type === 'Feature') return firstRingFromGeoJSON(g.geometry);
+  if (g.type === 'GeometryCollection') { for (const x of g.geometries || []){ const r = firstRingFromGeoJSON(x); if (r) return r; } return null; }
+  if (g.type === 'Polygon') return g.coordinates[0].map(c => [c[0], c[1]]);
+  if (g.type === 'MultiPolygon') return g.coordinates[0][0].map(c => [c[0], c[1]]);
+  return null;
+}
+function ringFromKML(xml){
+  const doc = new DOMParser().parseFromString(xml, 'text/xml');
+  let coordNode = null;
+  const polys = doc.getElementsByTagName('Polygon');
+  if (polys.length){
+    const outer = polys[0].getElementsByTagName('outerBoundaryIs')[0] || polys[0];
+    coordNode = outer.getElementsByTagName('coordinates')[0];
+  }
+  if (!coordNode){
+    const all = doc.getElementsByTagName('coordinates');
+    for (const c of all){ if (c.textContent.trim().split(/\s+/).length >= 3){ coordNode = c; break; } }
+  }
+  if (!coordNode) return null;
+  return coordNode.textContent.trim().split(/\s+/).map(s => s.split(',').map(Number)).filter(a => a.length >= 2 && validLL(a[0], a[1])).map(a => [a[0], a[1]]);
+}
+async function ringFromFile(file){
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.kmz')){
+    const zip = await JSZip.loadAsync(await file.arrayBuffer());
+    const entry = Object.values(zip.files).find(f => f.name.toLowerCase().endsWith('.kml'));
+    if (!entry) throw new Error('KMZ tidak berisi berkas .kml.');
+    return ringFromKML(await entry.async('string'));
+  }
+  const text = await file.text();
+  if (name.endsWith('.kml')) return ringFromKML(text);
+  return firstRingFromGeoJSON(JSON.parse(text));
+}
+
+$('dlgApply').onclick = async () => {
+  const err = $('dlgErr'); err.textContent = '';
+  try {
+    let ring;
+    if (!$('paneFile').hidden){
+      const f = $('file').files[0];
+      if (!f){ err.textContent = 'Pilih berkas dulu.'; return; }
+      ring = await ringFromFile(f);
+    } else {
+      ring = parseCoordText($('txt').value);
+    }
+    ring = ring ? dedupeClose(ring) : null;
+    if (!ring || ring.length < 3){ err.textContent = 'Tidak ada poligon dengan minimal 3 titik yang valid.'; return; }
+    pts = ring; closed = true; render(); fitPoly(); dlg.close();
+    say(`${ring.length} titik diimpor.`, 'ok');
+  } catch (e) { err.textContent = 'Gagal membaca data: ' + e.message; }
+};
+
+// ---- Export ----
+const slug = s => (s || 'lahan').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'lahan';
+
+$('btnExport').onclick = async () => {
+  if (pts.length < 3){ say('Gambar poligon dengan minimal 3 titik.', 'err'); return; }
+  const nama = $('nama').value.trim();
+  if (!nama){ say('Nama lahan / proyek wajib diisi.', 'err'); $('nama').focus(); return; }
+  if (!closed){ closed = true; render(); }
+  const area = geoArea(pts), per = perimeter(pts, true);
+  const sert = parseFloat(String($('luasSert').value).replace(/\./g, '').replace(',', '.'));
+  const v = id => $(id).value.trim();
+  const fields = [
+    ['NAMA', 'C', 80, 0, nama], ['KET', 'C', 100, 0, v('ket')],
+    ['PROVINSI', 'C', 50, 0, v('prov')], ['KAB_KOTA', 'C', 50, 0, v('kab')],
+    ['KECAMATAN', 'C', 50, 0, v('kec')], ['DESA_KEL', 'C', 50, 0, v('desa')],
+    ['PERUSAHAAN', 'C', 80, 0, v('pt')], ['PIC', 'C', 50, 0, v('pic')],
+    ['EMAIL', 'C', 60, 0, v('email')], ['TELP', 'C', 20, 0, v('telp')],
+    ['TIPE_HAK', 'C', 10, 0, v('hak')], ['NIB', 'C', 20, 0, v('nib')], ['NO_HAK', 'C', 30, 0, v('nohak')],
+    ['LUAS_M2', 'N', 18, 2, area], ['LUAS_HA', 'N', 16, 4, area / 10000],
+    ['LUAS_SERT', 'N', 18, 2, isFinite(sert) ? sert : 0], ['KELILING', 'N', 16, 2, per]
+  ];
+  try {
+    const f = makeShapefile(pts, fields), base = slug(nama);
+    const zip = new JSZip();
+    zip.file(base + '.shp', f.shp); zip.file(base + '.shx', f.shx);
+    zip.file(base + '.dbf', f.dbf); zip.file(base + '.prj', f.prj);
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = base + '_SHP.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    say(`${base}_SHP.zip diunduh (${fmt(area, 2)} m², ${pts.length} titik).`, 'ok');
+  } catch (e) { say('Gagal membuat SHP: ' + e.message, 'err'); }
+};
+
+// ---- Layer kustom (WMS / ArcGIS) ----
+const LKEY = 'shpmaker.layers.v1';
+let customDefs = [];
+const customLayers = {};
+function cSay(t, cls){ const m = $('cMsg'); m.textContent = t; m.className = 'msg ' + (cls || ''); }
+function buildCustom(c){
+  return c.kind === 'wms'
+    ? L.tileLayer.wms(c.url, { layers: c.layers, format: 'image/png', transparent: true, version: '1.1.1', opacity: opNow(), maxZoom: 19 })
+    : new ArcExport(c.url, { arcLayers: c.layers, opacity: opNow(), maxZoom: 19 });
+}
+function mountCustom(c, show){
+  const layer = buildCustom(c);
+  customLayers[c.id] = layer;
+  addOverlay(c.name, layer);
+  if (show) layer.addTo(map);
+}
+function renderCustomList(){
+  $('cList').innerHTML = customDefs.map(c =>
+    `<li><span><b>${c.name.replace(/</g, '&lt;')}</b> · ${c.kind === 'wms' ? 'WMS' : 'ArcGIS'}</span><button type="button" data-id="${c.id}">Hapus</button></li>`).join('');
+}
+function saveCustom(){ try { localStorage.setItem(LKEY, JSON.stringify(customDefs)); } catch (_) {} }
+$('cAdd').onclick = () => {
+  const name = $('cName').value.trim(), url = $('cUrl').value.trim(), layers = $('cLayers').value.trim(), kind = $('cKind').value;
+  if (!name || !/^https?:\/\//i.test(url)){ cSay('Isi nama dan URL yang diawali http:// atau https://.', 'err'); return; }
+  if (kind === 'wms' && !layers){ cSay('WMS butuh nama layer. Pakai tombol Jelajahi untuk melihat daftarnya.', 'err'); return; }
+  if (kind === 'arc' && !/\/MapServer\/?$/i.test(url)){ cSay('ArcGIS butuh URL service berakhiran /MapServer. Klik Jelajahi lalu pilih service.', 'err'); return; }
+  const c = { id: 'c' + Date.now(), name, kind, url, layers };
+  customDefs.push(c); mountCustom(c, true); renderCustomList(); saveCustom();
+  cSay(/^http:/i.test(url) && location.protocol === 'https:' ? 'Layer ditambahkan, tapi URL http diblokir di halaman https.' : 'Layer ditambahkan. Jika tidak tampil, cek URL dan nama layer.', 'ok');
+  $('cName').value = ''; $('cUrl').value = ''; $('cLayers').value = '';
+};
+// ---- Penjelajah layanan (berjalan di browser pengguna) ----
+let browseItems = [];
+function drawBrowse(){
+  const q = $('bFilter').value.trim().toLowerCase(), box = $('bList');
+  box.textContent = '';
+  const shown = browseItems.filter(i => !q || (i.label + ' ' + (i.hint || '')).toLowerCase().includes(q)).slice(0, 400);
+  if (!shown.length){ box.textContent = 'Tidak ada hasil.'; box.style.padding = '12px'; return; }
+  box.style.padding = '0';
+  shown.forEach(i => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.style.cssText = 'display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none';
+    const t = document.createElement('b'); t.textContent = i.label;
+    b.appendChild(t);
+    if (i.hint){ const s = document.createElement('div'); s.style.cssText = 'color:var(--muted);font-size:12px'; s.textContent = i.hint; b.appendChild(s); }
+    b.onclick = i.pick; box.appendChild(b);
+  });
+}
+$('bFilter').addEventListener('input', drawBrowse);
+function showBrowse(items){ browseItems = items; $('bBox').hidden = false; $('bFilter').value = ''; drawBrowse(); }
+
+async function browseArc(url){
+  const base = url.replace(/\/+$/, '').replace(/\?.*$/, '');
+  const root = base.includes('/rest/services') ? base.split('/rest/services')[0] + '/rest/services' : base;
+  const r = await fetch(base + '?f=json'); const j = await r.json();
+  if (j.error) throw new Error(j.error.message || 'Server menolak permintaan');
+  const items = [];
+  if (base !== root) items.push({ label: '.. kembali ke daftar utama', pick: () => browseArc(root).catch(browseFail) });
+  (j.folders || []).forEach(f => items.push({ label: f + '/', hint: 'Folder', pick: () => browseArc(base + '/' + f).catch(browseFail) }));
+  (j.services || []).filter(s => s.type === 'MapServer').forEach(s => items.push({
+    label: s.name, hint: 'MapServer',
+    pick: () => { $('cUrl').value = root + '/' + s.name + '/MapServer'; $('cName').value = $('cName').value || s.name.split('/').pop(); $('cLayers').value = ''; cSay('Service dipilih. Tambah ke peta, atau klik Jelajahi lagi untuk memilih layer tertentu.', 'ok'); }
+  }));
+  (j.layers || []).forEach(l => items.push({
+    label: l.id + ' · ' + l.name, hint: 'Layer ID ' + l.id,
+    pick: () => { $('cLayers').value = String(l.id); cSay('Layer ' + l.id + ' dipilih.', 'ok'); }
+  }));
+  if (!items.length) throw new Error('Tidak ada layanan MapServer di alamat ini');
+  showBrowse(items); cSay(`${items.length} entri dimuat.`, 'ok');
+}
+async function browseWms(url){
+  const sep = url.includes('?') ? '&' : '?';
+  const r = await fetch(url + sep + 'service=WMS&request=GetCapabilities');
+  const x = new DOMParser().parseFromString(await r.text(), 'text/xml');
+  const kid = (el, n) => [...el.children].find(c => c.localName === n);
+  const items = [...x.getElementsByTagName('Layer')].map(l => {
+    const n = kid(l, 'Name'), t = kid(l, 'Title'); if (!n) return null;
+    return { label: n.textContent, hint: t ? t.textContent : '', pick: () => { $('cLayers').value = n.textContent; if (!$('cName').value) $('cName').value = t ? t.textContent : n.textContent; cSay('Layer dipilih.', 'ok'); } };
+  }).filter(Boolean);
+  if (!items.length) throw new Error('GetCapabilities tidak berisi layer');
+  showBrowse(items); cSay(`${items.length} layer dimuat.`, 'ok');
+}
+function browseFail(e){
+  cSay('Gagal memuat daftar: ' + e.message + '. Server mungkin memblokir akses dari halaman ini (CORS). Buka URL layanan di tab baru, lalu salin nama layernya secara manual.', 'err');
+}
+$('cBrowse').onclick = () => {
+  const url = $('cUrl').value.trim();
+  if (!/^https?:\/\//i.test(url)){ cSay('Isi URL layanan dulu atau pilih preset.', 'err'); return; }
+  cSay('Memuat daftar...', '');
+  (($('cKind').value === 'wms') ? browseWms(url) : browseArc(url)).catch(browseFail);
+};
+$('cPreset').addEventListener('change', () => {
+  const v = $('cPreset').value; if (!v) return;
+  const [kind, url, name] = v.split('|');
+  $('cKind').value = kind; $('cUrl').value = url; $('cName').value = name; $('cLayers').value = '';
+  $('bBox').hidden = true; cSay('Preset terisi. Klik "Jelajahi layanan" untuk memilih layer.', '');
+});
+$('cList').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.id; if (!id) return;
+  const layer = customLayers[id];
+  if (layer){ map.removeLayer(layer); layerCtl.removeLayer(layer); const i = overlayLayers.indexOf(layer); if (i >= 0) overlayLayers.splice(i, 1); delete customLayers[id]; }
+  customDefs = customDefs.filter(c => c.id !== id); renderCustomList(); saveCustom();
+});
+$('ovOpacity').addEventListener('input', () => overlayLayers.forEach(l => l.setOpacity(opNow())));
+$('btnCtr').onclick = async () => {
+  if (pts.length < 3){ say('Gambar poligon dulu.', 'err'); return; }
+  const c = centroid(pts), t = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
+  try { await navigator.clipboard.writeText(t); say(`Titik tengah disalin (lat, lon): ${t}`, 'ok'); }
+  catch (_) { say(`Titik tengah (lat, lon): ${t}`, 'ok'); }
+};
+try { customDefs = JSON.parse(localStorage.getItem(LKEY) || '[]'); } catch (_) { customDefs = []; }
+customDefs.forEach(c => mountCustom(c, false));
+renderCustomList();
+
+// ---- Draft persistence ----
+const KEY = 'shpmaker.draft.v1';
+function save(){
+  try {
+    const d = { pts, closed }; FIELDS.forEach(f => d[f] = $(f).value);
+    localStorage.setItem(KEY, JSON.stringify(d));
+  } catch (_) {}
+}
+function load(){
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY) || 'null'); if (!d) return;
+    FIELDS.forEach(f => { if (d[f] != null) $(f).value = d[f]; });
+    if (Array.isArray(d.pts)){ pts = d.pts; closed = !!d.closed && pts.length >= 3; }
+  } catch (_) {}
+}
+FIELDS.forEach(f => $(f).addEventListener('input', () => { save(); stats(); }));
+$('btnReset').onclick = () => {
+  try { localStorage.removeItem(KEY); } catch (_) {}
+  FIELDS.forEach(f => $(f).value = ''); clearAll(); say('Draft dihapus.', '');
+};
+
+load(); render(); if (pts.length) fitPoly();
+</script>
+</body>
+</html>
