@@ -98,6 +98,47 @@ details.custom summary{cursor:pointer;font-weight:600;color:var(--muted)}
 .clist li{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:7px;padding:6px 10px;min-width:0}
 .clist li span{min-width:0;overflow-wrap:anywhere}
 input[type=range]{padding:0;accent-color:var(--accent)}
+.certbox{margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:13px}
+.certbox.warn{border-color:var(--warn)}
+.certbox b{display:block;margin-bottom:2px}
+.v{padding:5px 0;font-size:13px;border-bottom:1px solid var(--line)}
+.v.ok{color:var(--ok)} .v.bad{color:var(--warn)} .v.warn{color:var(--muted)}
+.guide{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:13px}
+.guide b{font-weight:600}
+.pn{display:block;width:14px;height:14px;margin:1px;border-radius:50%;background:#fff;border:1.5px solid #111;color:#111;font:700 8px/11px var(--sans);text-align:center}
+/* layout peta A4 (pratinjau di layar, cetak lewat dialog browser) */
+#sheetWrap{display:none}
+#sheetWrap.open{display:block;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.68);overflow:auto;padding:16px}
+.sheetbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 auto 12px;max-width:281mm;color:#fff;font-size:13px}
+.sheetbar select{width:auto}
+.sheetbar label{margin:0;color:#fff}
+#sheet{width:281mm;min-height:194mm;margin:0 auto;background:#fff;color:#111;padding:6mm;font:9pt/1.35 var(--sans);border:1px solid #888;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sh-head{display:flex;justify-content:space-between;align-items:flex-end;gap:6mm;border-bottom:2px solid #111;padding-bottom:2mm;margin-bottom:3mm}
+.sh-head h2{margin:0;font-size:13pt;letter-spacing:.02em}
+.sh-head p{margin:0;font-size:8pt;color:#444}
+.sh-body{display:grid;grid-template-columns:180mm minmax(0,1fr);gap:5mm;align-items:start}
+#pmap{width:180mm;height:128mm;border:1px solid #111;background:#ddd}
+.sh-side{max-height:128mm;overflow:hidden;min-width:0}
+.sh-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2mm}
+.sh-side dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:1mm 3mm;font-size:8pt}
+.sh-side dt{color:#444}
+.sh-side dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.sh-side h3{font-size:8pt;margin:3mm 0 1mm;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid #111;color:#111}
+.sh-leg{display:flex;align-items:center;gap:2mm;font-size:8pt}
+.sw{width:8mm;height:4mm;border:2px solid var(--poly);background:rgba(255,138,31,.2)}
+.sh-side table{width:100%;border-collapse:collapse;font:7pt var(--mono)}
+.sh-side th,.sh-side td{padding:.3mm 1mm;border-bottom:1px solid #ccc;text-align:left;background:none;position:static;color:#111;font-family:var(--mono);font-size:7pt}
+.sh-foot{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5mm;margin-top:4mm;font-size:8pt}
+.sign{border:1px solid #111;height:26mm;padding:1.5mm 2mm;display:flex;flex-direction:column;justify-content:space-between}
+.sign small{font-size:7pt;color:#444}
+@media print{
+  @page{size:A4 landscape;margin:6mm}
+  body{background:#fff!important;padding:0!important}
+  body>*:not(#sheetWrap){display:none!important}
+  #sheetWrap.open{position:static;background:none;padding:0;overflow:visible}
+  .sheetbar{display:none}
+  #sheet{border:0;margin:0;width:100%}
+}
 .vtx-wrap{background:none;border:0}
 .vtx{display:block;width:12px;height:12px;margin:3px;border-radius:50%;background:#fff;border:2px solid var(--poly);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 .vtx.first{width:18px;height:18px;margin:0;background:var(--poly)}
@@ -125,6 +166,7 @@ input[type=range]{padding:0;accent-color:var(--accent)}
       <div class="toolbar">
         <button id="btnLoc" type="button">Lokasi saya</button>
         <button id="btnImport" type="button">Impor KML / GeoJSON / koordinat</button>
+        <button id="btnSheet" type="button">Layout peta A4</button>
         <span class="spacer"></span>
         <button id="btnUndo" type="button">Urungkan</button>
         <button id="btnClear" type="button" class="danger">Hapus</button>
@@ -225,6 +267,7 @@ input[type=range]{padding:0;accent-color:var(--accent)}
       <div class="f"><label for="luasSert">Luas sertipikat (m²)</label>
         <div style="display:flex;gap:8px"><input id="luasSert" inputmode="decimal" autocomplete="off"><button id="btnCal" type="button" style="white-space:nowrap">Kalibrasi luas</button></div>
         <p class="note">Kalibrasi memperbesar atau memperkecil poligon terhadap titik tengahnya sampai luasnya sama dengan angka sertipikat.</p></div>
+      <div id="cert" class="certbox" hidden></div>
     </section>
 
     <section class="card">
@@ -249,6 +292,23 @@ input[type=range]{padding:0;accent-color:var(--accent)}
     </section>
 
     <section class="card">
+      <h2>Cek berkas SHP</h2>
+      <label for="vFile">Pilih ZIP Shapefile untuk diperiksa sebelum diunggah</label>
+      <input id="vFile" type="file" accept=".zip">
+      <div id="vOut" style="margin-top:10px"></div>
+    </section>
+
+    <section class="card">
+      <h2>Panduan unggah ke OSS-RBA</h2>
+      <ol class="guide">
+        <li><b>Proyeksi WGS84.</b> Berkas dibuat dalam EPSG:4326 dan .prj ikut dibuat.</li>
+        <li><b>Empat komponen.</b> ZIP berisi .shp, .shx, .dbf, dan .prj. Gunakan Cek berkas SHP untuk memastikan.</li>
+        <li><b>Cek tata ruang.</b> Pastikan zona peruntukan sesuai lewat portal GISTARU sebelum mengajukan KKPR, lalu isi kartu Tata ruang.</li>
+        <li><b>Unggah.</b> Pada formulir lokasi di OSS-RBA, unggah langsung file ZIP hasil unduhan.</li>
+      </ol>
+    </section>
+
+    <section class="card">
       <button id="btnExport" type="button" class="primary" style="width:100%;padding:11px" disabled>Buat dan unduh SHP</button>
       <div id="msg" class="msg" role="status"></div>
       <ul class="spec">
@@ -260,6 +320,41 @@ input[type=range]{padding:0;accent-color:var(--accent)}
     </section>
   </aside>
 </main>
+</div>
+
+<div id="sheetWrap" aria-hidden="true">
+  <div class="sheetbar">
+    <button id="btnPrint" type="button" class="primary">Cetak / simpan PDF</button>
+    <label for="sheetBase">Peta dasar</label>
+    <select id="sheetBase"><option value="esri">Citra satelit</option><option value="osm">OpenStreetMap</option><option value="carto">Peta terang</option></select>
+    <button id="btnSheetClose" type="button">Tutup</button>
+    <span>Di dialog cetak pilih tujuan "Simpan sebagai PDF", kertas A4, lanskap.</span>
+  </div>
+  <div id="sheet">
+    <div class="sh-head">
+      <div><h2>PETA POLIGON BIDANG TANAH / LOKASI USAHA</h2><p>Standar geospasial OSS-RBA · Datum WGS 1984 (EPSG:4326)</p></div>
+      <p id="shDate"></p>
+    </div>
+    <div class="sh-body">
+      <div id="pmap"></div>
+      <div class="sh-side">
+        <div class="sh-top">
+          <small style="font-size:7pt;color:#444">Skala grafis pada peta<br>Sumber citra: Esri / OSM / Carto</small>
+          <svg width="12mm" height="16mm" viewBox="0 0 40 52" aria-label="Arah utara"><polygon points="20,2 32,40 20,32 8,40" fill="#111"/><text x="20" y="51" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#111">U</text></svg>
+        </div>
+        <dl id="shInfo"></dl>
+        <h3>Legenda</h3>
+        <div class="sh-leg"><span class="sw"></span>Batas bidang / lahan</div>
+        <h3>Titik koordinat</h3>
+        <table><tbody id="shCoords"></tbody></table>
+      </div>
+    </div>
+    <div class="sh-foot">
+      <div class="sign"><div>Disusun oleh<br><b id="shBy"></b></div><small id="shBy2"></small></div>
+      <div class="sign"><div>Disetujui oleh<br><b id="shApplicant"></b></div><small>Pemohon / pelaku usaha</small></div>
+      <div class="sign"><div>Catatan</div><small>Dibuat otomatis dari poligon yang digambar. Luas dihitung geodesik pada WGS84 dan bukan pengganti ukuran sertipikat.</small></div>
+    </div>
+  </div>
 </div>
 
 <dialog id="dlg">
@@ -544,6 +639,7 @@ function stats(){
   $('sHa').textContent = fmt(a / 10000, 4);
   $('sPer').textContent = fmt(p, 2);
   $('sN').textContent = pts.length;
+  certSummary();
   let h;
   if (!pts.length) h = 'Klik peta untuk menambah titik sudut batas lahan.';
   else if (!closed && pts.length < 3) h = 'Tambah titik lagi. Poligon butuh minimal 3 titik.';
@@ -587,6 +683,7 @@ $('btnClear').onclick = clearAll;
 document.addEventListener('keydown', e => {
   const tag = (e.target.tagName || '').toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if ($('sheetWrap').classList.contains('open')) return;
   if (e.key === 'Escape' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')){ e.preventDefault(); undo(); }
 });
 
@@ -867,6 +964,145 @@ try { customDefs = JSON.parse(localStorage.getItem(LKEY) || '[]'); } catch (_) {
 customDefs.forEach(c => mountCustom(c, false));
 renderCustomList();
 
+// ---- Util ----
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const parseNum = s => parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+
+// ---- Warna poligon menurut tipe hak ----
+const HAK_COL = { SHM: '#1fa56b', HGB: '#ff9f1a', HGU: '#8b5cf6', HP: '#06b6d4', HPL: '#3b82f6', WAKAF: '#ec4899' };
+function applyHakColor(){
+  const c = HAK_COL[$('hak').value] || '#ff8a1f';
+  document.documentElement.style.setProperty('--poly', c);
+  poly.setStyle({ color: c, fillColor: c }); line.setStyle({ color: c }); rubber.setStyle({ color: c });
+}
+$('hak').addEventListener('change', applyHakColor);
+
+// ---- Ringkasan sertipikat dan selisih luas ----
+function certSummary(){
+  const el = $('cert');
+  const hak = $('hak').value, no = $('nohak').value.trim(), nib = $('nib').value.trim(), sert = parseNum($('luasSert').value);
+  if (!hak && !no && !nib && !(sert > 0)){ el.hidden = true; return; }
+  el.hidden = false;
+  const a = geoArea(pts);
+  let diff = '';
+  let warn = false;
+  if (sert > 0 && a > 0){
+    const pct = (a - sert) / sert * 100;
+    warn = Math.abs(pct) > 1;
+    diff = ` Selisih ${pct >= 0 ? '+' : ''}${fmt(pct, 2)}%${warn ? ' (di atas 1%, pertimbangkan kalibrasi)' : ''}.`;
+  }
+  el.className = 'certbox' + (warn ? ' warn' : '');
+  el.innerHTML = `<b>Ringkasan sertipikat</b>${esc(hak || '-')} · No. ${esc(no || '-')} · NIB ${esc(nib || '-')}<br>Luas poligon ${fmt(a, 2)} m², sertipikat ${sert > 0 ? fmt(sert, 2) : '-'} m².${esc(diff)}`;
+}
+
+// ---- Layout peta A4 ----
+const TILE_DEF = {
+  esri: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Citra &copy; Esri' }],
+  osm: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }],
+  carto: ['https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, subdomains: 'abcd', attribution: '&copy; OSM &copy; CARTO' }]
+};
+let pmap = null, pBase = null, pPoly = null, pMarks = [];
+function setPBase(k){
+  if (pBase) pmap.removeLayer(pBase);
+  const d = TILE_DEF[k] || TILE_DEF.esri;
+  pBase = L.tileLayer(d[0], d[1]).addTo(pmap);
+}
+function fillSheet(){
+  const v = id => $(id).value.trim();
+  const a = geoArea(pts), per = perimeter(pts, true), c = centroid(pts);
+  const loc = [v('desa'), v('kec'), v('kab'), v('prov')].filter(Boolean).join(', ') || '-';
+  const hak = [v('hak'), v('nohak') && ('No. ' + v('nohak')), v('nib') && ('NIB ' + v('nib'))].filter(Boolean).join(' · ') || '-';
+  const rows = [
+    ['Kegiatan', v('nama') || '-'], ['Pemohon', v('pt') || v('pic') || '-'], ['Keterangan', v('ket') || '-'],
+    ['Zona ruang', v('zona') || '-'], ['Status RDTR', v('rdtr') || '-'], ['Hak tanah', hak], ['Lokasi', loc],
+    ['Luas', `${fmt(a, 2)} m² (${fmt(a / 10000, 4)} ha)`], ['Keliling', `${fmt(per, 2)} m`],
+    ['Titik tengah', `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`]
+  ];
+  $('shInfo').innerHTML = rows.map(r => `<dt>${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join('');
+  const MAX = 10;
+  $('shCoords').innerHTML = '<tr><th>#</th><th>Longitude</th><th>Latitude</th></tr>'
+    + pts.slice(0, MAX).map((p, i) => `<tr><td>${i + 1}</td><td>${p[0].toFixed(6)}</td><td>${p[1].toFixed(6)}</td></tr>`).join('')
+    + (pts.length > MAX ? `<tr><td colspan="3">dan ${pts.length - MAX} titik lainnya</td></tr>` : '');
+  $('shDate').textContent = 'Dicetak: ' + new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  $('shBy').textContent = v('pic') || '';
+  $('shBy2').textContent = v('pt') || '';
+  $('shApplicant').textContent = v('pt') || v('pic') || '';
+}
+function buildPmap(){
+  if (!pmap){
+    pmap = L.map('pmap', { zoomControl: false, zoomSnap: .25, zoomDelta: .5 });
+    L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(pmap);
+    setPBase($('sheetBase').value);
+  }
+  pmap.invalidateSize();
+  if (pPoly) pPoly.remove(); pMarks.forEach(m => m.remove()); pMarks = [];
+  const col = getComputedStyle(document.documentElement).getPropertyValue('--poly').trim() || '#ff8a1f';
+  pPoly = L.polygon(ll(), { color: col, weight: 3, fillColor: col, fillOpacity: .2 }).addTo(pmap);
+  if (pts.length <= 40) pts.forEach((p, i) => pMarks.push(L.marker([p[1], p[0]], { interactive: false, keyboard: false,
+    icon: L.divIcon({ className: 'vtx-wrap', html: `<span class="pn">${i + 1}</span>`, iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(pmap)));
+  pmap.fitBounds(pPoly.getBounds(), { padding: [30, 30], maxZoom: 19 });
+}
+$('btnSheet').onclick = () => {
+  if (pts.length < 3){ say('Gambar poligon dulu sebelum membuat layout.', 'err'); return; }
+  fillSheet();
+  $('sheetWrap').classList.add('open'); $('sheetWrap').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  setTimeout(buildPmap, 60);
+};
+$('btnSheetClose').onclick = () => {
+  $('sheetWrap').classList.remove('open'); $('sheetWrap').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+};
+$('sheetBase').addEventListener('change', () => { if (pmap) setPBase($('sheetBase').value); });
+$('btnPrint').onclick = () => window.print();
+
+// ---- Validator ZIP SHP ----
+$('vFile').addEventListener('change', async e => {
+  const f = e.target.files[0], out = $('vOut'); out.textContent = '';
+  if (!f) return;
+  const add = (cls, t) => {
+    const d = document.createElement('div'); d.className = 'v ' + cls;
+    d.textContent = (cls === 'ok' ? 'OK · ' : cls === 'bad' ? 'Gagal · ' : 'Periksa · ') + t; out.appendChild(d);
+  };
+  try {
+    const zip = await JSZip.loadAsync(await f.arrayBuffer());
+    const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+    const parts = {};
+    for (const ext of ['.shp', '.shx', '.dbf', '.prj']){
+      const n = names.find(x => x.toLowerCase().endsWith(ext)); parts[ext] = n;
+      add(n ? 'ok' : 'bad', n ? `${ext} ditemukan (${n})` : `${ext} tidak ada`);
+    }
+    const bases = new Set(Object.values(parts).filter(Boolean).map(n => n.replace(/\.[^.]+$/, '')));
+    if (bases.size > 1) add('warn', 'Nama dasar berkas berbeda: ' + [...bases].join(', ') + '. Sebaiknya sama.');
+    if (names.some(n => n.includes('/'))) add('warn', 'Berkas berada di dalam folder. Sebaiknya taruh langsung di akar ZIP.');
+    if (parts['.prj']){
+      const t = await zip.files[parts['.prj']].async('string');
+      if (/GCS_WGS_1984|WGS[_ ]?84|4326/i.test(t)) add('ok', 'Proyeksi terbaca sebagai WGS84');
+      else add('bad', 'Proyeksi bukan WGS84: ' + t.slice(0, 70));
+    }
+    if (parts['.shp']){
+      const b = await zip.files[parts['.shp']].async('arraybuffer'), dv = new DataView(b);
+      if (b.byteLength < 100 || dv.getInt32(0, false) !== 9994) add('bad', '.shp bukan berkas shapefile yang valid');
+      else {
+        const type = dv.getInt32(32, true), xmin = dv.getFloat64(36, true), ymin = dv.getFloat64(44, true), xmax = dv.getFloat64(52, true), ymax = dv.getFloat64(60, true);
+        add([5, 15, 25].includes(type) ? 'ok' : 'warn', `Tipe geometri ${type}` + ([5, 15, 25].includes(type) ? ' (poligon)' : ' (bukan poligon)'));
+        const deg = Math.abs(xmin) <= 180 && Math.abs(xmax) <= 180 && Math.abs(ymin) <= 90 && Math.abs(ymax) <= 90;
+        add(deg ? 'ok' : 'bad', deg ? `Rentang koordinat derajat (X ${xmin.toFixed(4)} s/d ${xmax.toFixed(4)}, Y ${ymin.toFixed(4)} s/d ${ymax.toFixed(4)})` : 'Koordinat di luar rentang derajat. Kemungkinan memakai UTM atau TM-3, bukan WGS84.');
+      }
+    }
+    if (parts['.shx']){
+      const b = await zip.files[parts['.shx']].async('arraybuffer');
+      add('ok', `.shx berisi ${Math.max(0, Math.round((b.byteLength - 100) / 8))} rekaman`);
+    }
+    if (parts['.dbf']){
+      const u = new Uint8Array(await zip.files[parts['.dbf']].async('arraybuffer')), dv = new DataView(u.buffer);
+      const n = dv.getUint32(4, true), names2 = [];
+      for (let o = 32; o < u.length && u[o] !== 0x0d; o += 32) names2.push(String.fromCharCode(...u.slice(o, o + 11)).replace(/\0.*$/, ''));
+      add(names2.length ? 'ok' : 'warn', `.dbf: ${n} rekaman, ${names2.length} kolom` + (names2.length ? ` (${names2.join(', ')})` : ''));
+    }
+  } catch (err){ add('bad', 'Berkas bukan ZIP yang valid: ' + err.message); }
+});
+
 // ---- Draft persistence ----
 const KEY = 'shpmaker.draft.v1';
 function save(){
@@ -888,7 +1124,7 @@ $('btnReset').onclick = () => {
   FIELDS.forEach(f => $(f).value = ''); clearAll(); say('Draft dihapus.', '');
 };
 
-load(); render(); if (pts.length) fitPoly();
+load(); applyHakColor(); render(); if (pts.length) fitPoly();
 </script>
 </body>
 </html>
