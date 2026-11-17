@@ -141,7 +141,7 @@ input[type=range]{padding:0;accent-color:var(--accent)}
 
     <section class="card">
       <h2>Layer tambahan</h2>
-      <p class="note" style="margin-top:0">Kawasan Hutan dan PIPPIB dari KLHK tersedia di kontrol layer pojok kanan atas peta. Layer lain bisa ditambahkan sendiri di bawah.</p>
+      <p class="note" style="margin-top:0">Kawasan Hutan dan PIPPIB dari KLHK tersedia di kontrol layer pojok kanan atas peta. Layanan ATR/BPN (BHUMI, GISTARU) tidak terbuka untuk akses langsung, jadi pakai portal resminya di bawah dan isi hasil zonasi di kartu Tata ruang. Layer lain yang punya URL resmi bisa ditambahkan sendiri.</p>
       <div class="f" style="margin-top:12px"><label for="ovOpacity">Transparansi overlay</label>
         <input type="range" id="ovOpacity" min="20" max="100" value="60"></div>
 
@@ -158,9 +158,6 @@ input[type=range]{padding:0;accent-color:var(--accent)}
         <div class="f" style="margin-top:12px"><label for="cPreset">Preset layanan</label>
           <select id="cPreset">
             <option value="">Pilih preset (opsional)</option>
-            <option value="wms|https://bhumi.atrbpn.go.id/geoserver/wms|BHUMI GeoServer">BHUMI GeoServer (WMS)</option>
-            <option value="wms|https://geosvc.atrbpn.go.id/geoserver/wms|GeoSVC ATR/BPN">GeoSVC ATR/BPN (WMS)</option>
-            <option value="arc|https://gistaru.atrbpn.go.id/arcgis/rest/services|GISTARU">GISTARU tata ruang (ArcGIS REST)</option>
             <option value="arc|https://dki-siap.atrbpn.go.id/server/rest/services|DKI SIAP">DKI Jakarta SIAP (ArcGIS REST)</option>
             <option value="arc|https://geoportal.menlhk.go.id/server/rest/services|KLHK">Geoportal KLHK (ArcGIS REST)</option>
           </select></div>
@@ -231,6 +228,17 @@ input[type=range]{padding:0;accent-color:var(--accent)}
     </section>
 
     <section class="card">
+      <h2>Tata ruang</h2>
+      <div class="f"><label for="zona">Zona peruntukan ruang (RTRW / RDTR)</label><input id="zona" autocomplete="off" placeholder="Contoh: Kawasan Peruntukan Industri"></div>
+      <div class="grid2">
+        <div class="f"><label for="rdtr">Status RDTR</label>
+          <select id="rdtr"><option value="">Pilih status</option><option>Sudah ada RDTR</option><option>Belum ada RDTR</option><option>Hanya RTRW</option></select></div>
+        <div class="f"><label for="sumber">Sumber data</label><input id="sumber" autocomplete="off" placeholder="GISTARU / Perda RTRW"></div>
+      </div>
+      <p class="note">Isi dari hasil cek di portal GISTARU (RDTR Interaktif atau RTR Online). Nilainya ikut tersimpan di tabel atribut SHP.</p>
+    </section>
+
+    <section class="card">
       <h2>Pemohon</h2>
       <div class="f"><label for="pt">Perusahaan / badan usaha</label><input id="pt" autocomplete="organization"></div>
       <div class="f"><label for="pic">Penanggung jawab</label><input id="pic" autocomplete="name"></div>
@@ -246,7 +254,7 @@ input[type=range]{padding:0;accent-color:var(--accent)}
       <ul class="spec">
         <li>Proyeksi EPSG:4326 (WGS84), file .prj ikut dibuat</li>
         <li>ZIP berisi .shp, .shx, .dbf, .prj</li>
-        <li>Atribut: nama, wilayah, hak tanah, pemohon, luas, keliling</li>
+        <li>Atribut: nama, wilayah, tata ruang, hak tanah, pemohon, luas, keliling</li>
       </ul>
       <p class="note"><button id="btnReset" type="button" class="danger" style="padding:4px 10px">Reset draft</button> Draf tersimpan otomatis di browser ini.</p>
     </section>
@@ -450,7 +458,7 @@ const PROVINSI = ['Aceh','Sumatera Utara','Sumatera Barat','Riau','Kepulauan Ria
 document.getElementById('provList').innerHTML = PROVINSI.map(p => `<option value="${p}">`).join('');
 
 const $ = id => document.getElementById(id);
-const FIELDS = ['prov','kab','kec','desa','nama','ket','hak','nib','nohak','luasSert','pt','pic','email','telp'];
+const FIELDS = ['prov','kab','kec','desa','nama','ket','hak','nib','nohak','luasSert','zona','rdtr','sumber','pt','pic','email','telp'];
 const fmt = (n, d = 0) => n.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d });
 
 let pts = [];          // [lon, lat]
@@ -720,6 +728,7 @@ $('btnExport').onclick = async () => {
     ['KECAMATAN', 'C', 50, 0, v('kec')], ['DESA_KEL', 'C', 50, 0, v('desa')],
     ['PERUSAHAAN', 'C', 80, 0, v('pt')], ['PIC', 'C', 50, 0, v('pic')],
     ['EMAIL', 'C', 60, 0, v('email')], ['TELP', 'C', 20, 0, v('telp')],
+    ['ZONA_RTRW', 'C', 80, 0, v('zona')], ['STATUS_RDT', 'C', 20, 0, v('rdtr')], ['SUMBER_TR', 'C', 40, 0, v('sumber')],
     ['TIPE_HAK', 'C', 10, 0, v('hak')], ['NIB', 'C', 20, 0, v('nib')], ['NO_HAK', 'C', 30, 0, v('nohak')],
     ['LUAS_M2', 'N', 18, 2, area], ['LUAS_HA', 'N', 16, 4, area / 10000],
     ['LUAS_SERT', 'N', 18, 2, isFinite(sert) ? sert : 0], ['KELILING', 'N', 16, 2, per]
@@ -769,6 +778,11 @@ $('cAdd').onclick = () => {
   cSay(/^http:/i.test(url) && location.protocol === 'https:' ? 'Layer ditambahkan, tapi URL http diblokir di halaman https.' : 'Layer ditambahkan. Jika tidak tampil, cek URL dan nama layer.', 'ok');
   $('cName').value = ''; $('cUrl').value = ''; $('cLayers').value = '';
 };
+// fetch dengan batas waktu 20 detik agar tidak menggantung
+function fetchT(url, ms = 20000){
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), ms);
+  return fetch(url, { signal: ac.signal }).finally(() => clearTimeout(t));
+}
 // ---- Penjelajah layanan (berjalan di browser pengguna) ----
 let browseItems = [];
 function drawBrowse(){
@@ -792,7 +806,7 @@ function showBrowse(items){ browseItems = items; $('bBox').hidden = false; $('bF
 async function browseArc(url){
   const base = url.replace(/\/+$/, '').replace(/\?.*$/, '');
   const root = base.includes('/rest/services') ? base.split('/rest/services')[0] + '/rest/services' : base;
-  const r = await fetch(base + '?f=json'); const j = await r.json();
+  const r = await fetchT(base + '?f=json'); const j = await r.json();
   if (j.error) throw new Error(j.error.message || 'Server menolak permintaan');
   const items = [];
   if (base !== root) items.push({ label: '.. kembali ke daftar utama', pick: () => browseArc(root).catch(browseFail) });
@@ -810,7 +824,7 @@ async function browseArc(url){
 }
 async function browseWms(url){
   const sep = url.includes('?') ? '&' : '?';
-  const r = await fetch(url + sep + 'service=WMS&request=GetCapabilities');
+  const r = await fetchT(url + sep + 'service=WMS&request=GetCapabilities');
   const x = new DOMParser().parseFromString(await r.text(), 'text/xml');
   const kid = (el, n) => [...el.children].find(c => c.localName === n);
   const items = [...x.getElementsByTagName('Layer')].map(l => {
@@ -821,7 +835,8 @@ async function browseWms(url){
   showBrowse(items); cSay(`${items.length} layer dimuat.`, 'ok');
 }
 function browseFail(e){
-  cSay('Gagal memuat daftar: ' + e.message + '. Server mungkin memblokir akses dari halaman ini (CORS). Buka URL layanan di tab baru, lalu salin nama layernya secara manual.', 'err');
+  const why = e && e.name === 'AbortError' ? 'server tidak menjawab dalam 20 detik' : (e && e.message) || 'tidak diketahui';
+  cSay('Gagal memuat daftar: ' + why + '. Server mungkin lambat atau memblokir akses dari halaman ini (CORS). Buka URL layanan di tab baru, lalu salin nama layernya secara manual.', 'err');
 }
 $('cBrowse').onclick = () => {
   const url = $('cUrl').value.trim();
